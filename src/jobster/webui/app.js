@@ -85,6 +85,7 @@ const activityLabels = {
   application_browser_error: "Application page problem",
   application_submission_window_closed: "Application paused by schedule",
   application_submission_not_authorized: "Final submission not authorized",
+  application_target_resolved: "Real application page found",
   application_preparation_paused: "Application preparation paused",
   discovery_cycle_completed: "Job search finished",
   job_verified: "Job page checked",
@@ -960,7 +961,7 @@ function renderReadiness() {
   $("site-capability-list").innerHTML = application_sites.map((site) => `
     <div class="site-capability">
       <strong>${esc(site.name)}</strong>
-      <span class="capability-pill ${site.level === "check_only" ? "check-only" : ""}">${site.level === "check_only" ? "Can check only" : "Can fill + submit"}</span>
+      <span class="capability-pill ${site.level !== "fill_and_submit" ? "check-only" : ""}">${site.level === "check_only" ? "Can check only" : site.level === "prepare_only" ? "Can prepare · human submits" : "Can fill + submit"}</span>
     </div>
   `).join("");
 }
