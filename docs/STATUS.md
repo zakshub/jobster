@@ -2,7 +2,7 @@
 
 ## Status
 
-**PERSONAL MVP COMPLETE — v0.1.0**
+**PERSONAL RUNTIME + ENTERPRISE COMMAND CENTER IMPLEMENTED**
 
 Validated on GitHub Actions after the final application-orchestration fix.
 
@@ -68,7 +68,7 @@ Specifications:
 
 The Figma specification is complete.
 
-This is a design milestone, not a claim that the HTML/React web frontend has already been implemented or deployed.
+The local production web interface is now implemented and connected to live Jobster runtime data. VPS deployment remains separate.
 
 ## Default safety state
 
@@ -88,7 +88,7 @@ Live personal operation still requires owner-controlled runtime inputs:
 6. supervised validation of each ATS against live forms before unattended auto-submit
 7. VPS deployment
 
-Coded web frontend implementation and hosting remain separate from the approved Figma design.
+Local coded frontend implementation is complete. VPS hosting remains separate.
 
 ## Web command center
 
@@ -123,3 +123,27 @@ Coded web frontend implementation and hosting remain separate from the approved 
 - [x] User-facing wording avoids developer jargon where a simple phrase is available
 - [x] Beginner, junior, senior and non-technical users should be able to understand core actions without knowing APIs, ATS terminology, semantic scoring or backend architecture
 - [x] Technical names remain internal unless they are necessary to explain a real limitation
+
+
+## Enterprise command center
+
+- [x] Enterprise information architecture: Today, Opportunities, Applications, Needs you, Career Brain, Activity, Settings
+- [x] Original inline SVG icon system
+- [x] Career Orbit operational artwork
+- [x] Saved jobs
+- [x] Hidden jobs
+- [x] Private job notes
+- [x] Source filter, match filter and sorting
+- [x] First-class human decision queue
+- [x] Application pipeline summaries
+- [x] Career Brain readiness
+- [x] Application-site capability visibility
+- [x] Ctrl/Cmd + K command menu
+- [x] Persistent draggable/resizable live job-search window
+- [x] Display preferences for reduced motion, compact list and live-window behavior
+- [x] Responsive desktop/tablet/mobile layout
+- [x] DOM/icon contract tests
+- [x] Plain-English interface standard
+
+Canonical enterprise UI specification:
+`docs/design/ENTERPRISE_COMMAND_CENTER.md`
