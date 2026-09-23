@@ -9,6 +9,7 @@ import httpx
 
 from jobster.models import Job
 from jobster.quota import SerpApiQuota
+from jobster.text_utils import repair_text
 from .base import JobSource
 from .source_registry import SOURCE_REGISTRY
 
@@ -31,7 +32,7 @@ def _source_for_url(url: str) -> str:
 
 
 def _title_and_company(raw_title: str, source: str) -> tuple[str, str]:
-    title = raw_title.strip()
+    title = repair_text(raw_title).strip()
     for suffix in (
         " | LinkedIn",
         " - LinkedIn",
@@ -65,7 +66,7 @@ def parse_serpapi_web(payload: dict) -> list[Job]:
 
         source = _source_for_url(link)
         title, company = _title_and_company(raw_title, source)
-        snippet = str(item.get("snippet") or "")
+        snippet = repair_text(item.get("snippet") or "")
         haystack = f"{raw_title} {snippet}".lower()
         remote = True if "remote" in haystack or "worldwide" in haystack else None
         stable = hashlib.sha1(link.encode("utf-8")).hexdigest()[:20]
