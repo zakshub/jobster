@@ -1,6 +1,6 @@
 import pytest
 
-from jobster.executors.browser_form import BrowserExecutionError, GenericCareersExecutor, WorkdayExecutor
+from jobster.executors.browser_form import BrowserExecutionError, GenericCareersExecutor, WorkdayExecutor, classify_form_action
 from jobster.executors.registry import get_executor
 from jobster.models import ApplicationPlan, ApplicationState, Job
 
@@ -37,3 +37,11 @@ def test_generic_company_careers_form_is_supervised():
     assert executor.capability.can_inspect is True
     assert executor.capability.can_fill is True
     assert executor.capability.can_submit is False
+
+
+def test_form_action_classifier_separates_next_from_final_submit():
+    assert classify_form_action("Continue") == "next"
+    assert classify_form_action("Review application") == "next"
+    assert classify_form_action("Submit application") == "final"
+    assert classify_form_action("Apply now") == "final"
+    assert classify_form_action("Cancel") == "other"
