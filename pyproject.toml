@@ -32,4 +32,4 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-jobster = ["webui/*.html", "webui/*.css", "webui/*.js"]
+jobster = ["webui/*.html", "webui/*.css", "webui/*.js", "webui/*.webmanifest"]

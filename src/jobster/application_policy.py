@@ -57,6 +57,19 @@ def build_application_plan(
             unknown.append(question)
             reasons.append(f"Required question has no approved answer: {question.label}")
 
+    # Keep every explicitly approved reusable answer available to the browser
+    # executor. Multi-page forms often reveal later questions only after the
+    # first page has been completed. This does not weaken sensitive-answer
+    # safeguards: only verified answers with automatic-use permission enter
+    # this map.
+    for answer in answer_bank:
+        if not answer.verified or not answer.allow_automatic_use:
+            continue
+        for raw_key in [answer.key, *answer.aliases]:
+            normalized = normalize_question(raw_key)
+            if normalized:
+                known.setdefault(normalized, answer.value)
+
     can_submit = allow_final_submit and not blocked and not unknown
     state = ApplicationState.READY if can_submit else ApplicationState.BLOCKED if blocked or unknown else ApplicationState.PREPARING
 

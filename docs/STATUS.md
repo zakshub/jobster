@@ -147,3 +147,57 @@ Local coded frontend implementation is complete. VPS hosting remains separate.
 
 Canonical enterprise UI specification:
 `docs/design/ENTERPRISE_COMMAND_CENTER.md`
+
+
+## Omni Career OS expansion
+
+- [x] Today's focus / daily missions
+- [x] Agent pulse
+- [x] Job decision confidence and requirement-level fit view
+- [x] Career value view
+- [x] Opportunity comparison workspace
+- [x] Explicit career feedback without silent model mutation
+- [x] Company watchlist
+- [x] Company activity summaries
+- [x] Contacts / lightweight recruiter CRM
+- [x] Recruiter message advisor
+- [x] Outreach draft queue
+- [x] Interview records
+- [x] STAR interview story bank
+- [x] Offer records
+- [x] Negotiation desk
+- [x] Funnel intelligence
+- [x] Funnel bottleneck diagnosis
+- [x] Source performance intelligence
+- [x] Role-family signals
+- [x] Stored salary intelligence
+- [x] Repeated gap signals
+- [x] Career evidence health
+- [x] Career goals
+- [x] Notifications
+- [x] Opportunity watch rules
+- [x] Application artifact history
+- [x] Data export
+- [x] Installable PWA shell
+- [x] Authority Center
+- [x] Emergency Stop
+- [x] Job-board apply-link discovery
+- [x] Direct application page routing
+- [x] Supervised generic company-career form support
+- [x] Guarded multi-step supported-ATS form execution
+- [x] Later-page unknown-question checkpoint
+- [x] Login/CAPTCHA human checkpoint
+- [x] Confirmed-submission screenshot proof
+- [x] Human editorial anti-AI visual language
+
+### External connection boundaries
+
+- [ ] Authenticated email sending — requires mail connector/provider
+- [ ] Live calendar synchronization — requires calendar connector
+- [ ] Direct LinkedIn messaging — not implemented
+- [ ] Workday final auto-submit — still inspection-only
+- [ ] Arbitrary custom career-site final auto-submit — supervised unless explicitly validated
+- [ ] Production multi-user authentication/hosting — local personal runtime remains the current deployment
+
+Canonical scope:
+`docs/product/OMNI_CAREER_OS.md`

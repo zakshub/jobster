@@ -241,5 +241,73 @@ def run_cycle(
         "ai_review_reason": semantic_pause["message"] if semantic_pause else None,
     }
     store.audit("discovery_cycle_completed", summary)
+
+    strong_count = (
+        counts.get("apply", 0)
+        + counts.get("high_priority", 0)
+        + counts.get("aggressive_pursuit", 0)
+    )
+    if strong_count:
+        store.add_notification(
+            "success",
+            "New strong job matches",
+            f"Jobster found {strong_count} job{'s' if strong_count != 1 else ''} worth a closer look.",
+        )
+    if summary.get("ai_review_paused"):
+        store.add_notification(
+            "warning",
+            "Advanced job review paused",
+            summary.get("ai_review_reason")
+            or "Jobster continued with its built-in basic review.",
+        )
+    if applications.get("blocked", 0):
+        store.add_notification(
+            "warning",
+            "Applications need your input",
+            f"{applications['blocked']} application{'s' if applications['blocked'] != 1 else ''} stopped instead of guessing an answer.",
+        )
+    if applications.get("submitted_confirmed", 0):
+        store.add_notification(
+            "success",
+            "Application submitted",
+            f"{applications['submitted_confirmed']} application{'s were' if applications['submitted_confirmed'] != 1 else ' was'} confirmed as submitted.",
+        )
+
+    for rule in store.list_watch_rules(limit=100):
+        if not rule.get("enabled"):
+            continue
+        criteria = rule.get("criteria") or {}
+        matches = []
+        for job in jobs:
+            title_contains = str(criteria.get("title_contains") or "").strip().lower()
+            company = str(criteria.get("company") or "").strip().lower()
+            currency = str(criteria.get("currency") or "").strip()
+            minimum_raw = criteria.get("minimum_monthly")
+            try:
+                minimum_monthly = float(minimum_raw) if minimum_raw not in (None, "") else None
+            except (TypeError, ValueError):
+                minimum_monthly = None
+
+            if title_contains and title_contains not in job.title.lower():
+                continue
+            if company and company not in job.company.lower():
+                continue
+            if currency and job.currency and job.currency != currency:
+                continue
+            if minimum_monthly is not None:
+                listed = job.salary_max_monthly or job.salary_min_monthly
+                if listed is None or float(listed) < minimum_monthly:
+                    continue
+            matches.append(job)
+
+        if matches:
+            top = matches[0]
+            store.add_notification(
+                "success",
+                f"Watch rule matched: {rule['label']}",
+                f"{len(matches)} job{'s' if len(matches) != 1 else ''} matched. Top match: {top.title} at {top.company}.",
+                job_id=top.id,
+            )
+
     emit("cycle_completed", summary)
     return summary

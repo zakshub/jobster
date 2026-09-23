@@ -2,18 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import os
+import uuid
 from collections import Counter, deque
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .answer_bank import load_answer_bank
 from .application_packet import build_application_packet
-from .models import Job, JobEvaluation
+from .intelligence import build_daily_missions, build_evidence_snapshot, build_insights
+from .models import Job, JobEvaluation, NegotiationContext
+from .negotiation import negotiation_advice
+from .recruiter import advise_recruiter_message
 from .profile import load_profile
 from .quota import SerpApiQuota
 from .relevance import score_job_relevance
@@ -250,6 +254,18 @@ def create_app() -> FastAPI:
     def index():
         return FileResponse(static_dir / "index.html")
 
+    @app.get("/manifest.webmanifest", include_in_schema=False)
+    def manifest():
+        return FileResponse(static_dir / "manifest.webmanifest", media_type="application/manifest+json")
+
+    @app.get("/service-worker.js", include_in_schema=False)
+    def service_worker():
+        return FileResponse(
+            static_dir / "service-worker.js",
+            media_type="application/javascript",
+            headers={"Service-Worker-Allowed": "/"},
+        )
+
     @app.get("/api/status")
     def status():
         profile, config, store = _runtime()
@@ -300,6 +316,371 @@ def create_app() -> FastAPI:
             },
             "cycle": cycle_controller.snapshot(),
         }
+
+    @app.get("/api/missions")
+    def missions():
+        profile, _, store = _runtime()
+        return build_daily_missions(profile, store)
+
+    @app.get("/api/insights")
+    def insights():
+        profile, _, store = _runtime()
+        return build_insights(profile, store)
+
+    @app.get("/api/evidence")
+    def evidence():
+        profile, _, _ = _runtime()
+        return build_evidence_snapshot(profile)
+
+    @app.get("/api/companies")
+    def companies(limit: int = 200):
+        _, _, store = _runtime()
+        return store.list_company_summaries(limit=min(max(limit, 1), 500))
+
+    @app.post("/api/companies/watch")
+    def watch_company(payload: dict):
+        _, _, store = _runtime()
+        company = str(payload.get("company") or "").strip()
+        if not company:
+            raise HTTPException(status_code=400, detail="Company is required")
+        watching = payload.get("watching", True)
+        if not isinstance(watching, bool):
+            raise HTTPException(status_code=400, detail="watching must be true or false")
+        note = payload.get("note")
+        if note is not None and not isinstance(note, str):
+            raise HTTPException(status_code=400, detail="note must be text")
+        result = store.set_company_watch(company, watching, note)
+        store.audit("company_watch_updated", result)
+        return result
+
+    @app.get("/api/feedback")
+    def feedback(limit: int = 200):
+        _, _, store = _runtime()
+        return store.list_feedback(limit=min(max(limit, 1), 500))
+
+    @app.post("/api/feedback")
+    def add_feedback(payload: dict):
+        _, _, store = _runtime()
+        reaction = str(payload.get("reaction") or "").strip()
+        if not reaction:
+            raise HTTPException(status_code=400, detail="Reaction is required")
+        if reaction not in {
+            "interesting",
+            "not_for_me",
+            "would_apply",
+            "too_generic",
+            "salary_too_low",
+            "outside_direction",
+            "worth_stretching",
+            "not_worth_stretching",
+            "good_company_bad_role",
+        }:
+            raise HTTPException(status_code=400, detail="Unknown feedback type")
+        job_id = payload.get("job_id")
+        if job_id and store.get_job_bundle(str(job_id)) is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        note = payload.get("note")
+        if note is not None and not isinstance(note, str):
+            raise HTTPException(status_code=400, detail="note must be text")
+        return store.save_feedback(str(job_id) if job_id else None, reaction, note)
+
+    @app.get("/api/contacts")
+    def contacts(limit: int = 300):
+        _, _, store = _runtime()
+        return store.list_contacts(limit=min(max(limit, 1), 500))
+
+    @app.post("/api/contacts")
+    def save_contact(payload: dict):
+        _, _, store = _runtime()
+        name = str(payload.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name is required")
+        contact = {
+            "id": str(payload.get("id") or uuid.uuid4()),
+            "name": name,
+            "company": str(payload.get("company") or "").strip() or None,
+            "role": str(payload.get("role") or "").strip() or None,
+            "email": str(payload.get("email") or "").strip() or None,
+            "linkedin_url": str(payload.get("linkedin_url") or "").strip() or None,
+            "relationship": str(payload.get("relationship") or "new").strip() or "new",
+            "note": str(payload.get("note") or "").strip() or None,
+        }
+        result = store.upsert_contact(contact)
+        store.audit("contact_saved", {"id": result["id"], "name": result["name"]})
+        return result
+
+    @app.post("/api/recruiter/advice")
+    def recruiter_advice(payload: dict):
+        message = str(payload.get("message") or "").strip()
+        if not message:
+            raise HTTPException(status_code=400, detail="Paste the recruiter message first")
+        return advise_recruiter_message(message).model_dump()
+
+    @app.get("/api/interviews")
+    def interviews(limit: int = 200):
+        _, _, store = _runtime()
+        return store.list_interviews(limit=min(max(limit, 1), 500))
+
+    @app.post("/api/interviews")
+    def save_interview(payload: dict):
+        _, _, store = _runtime()
+        company = str(payload.get("company") or "").strip()
+        title = str(payload.get("title") or "").strip()
+        if not company or not title:
+            raise HTTPException(status_code=400, detail="Company and title are required")
+        item = {
+            "id": str(payload.get("id") or uuid.uuid4()),
+            "job_id": str(payload.get("job_id") or "").strip() or None,
+            "company": company,
+            "title": title,
+            "scheduled_at": str(payload.get("scheduled_at") or "").strip() or None,
+            "format": str(payload.get("format") or "").strip() or None,
+            "status": str(payload.get("status") or "planned").strip() or "planned",
+            "note": str(payload.get("note") or "").strip() or None,
+        }
+        result = store.upsert_interview(item)
+        store.audit("interview_saved", {"id": result["id"], "company": company})
+        return result
+
+    @app.get("/api/offers")
+    def offers(limit: int = 100):
+        _, _, store = _runtime()
+        return store.list_offers(limit=min(max(limit, 1), 300))
+
+    @app.post("/api/offers")
+    def save_offer(payload: dict):
+        _, _, store = _runtime()
+        company = str(payload.get("company") or "").strip()
+        title = str(payload.get("title") or "").strip()
+        if not company or not title:
+            raise HTTPException(status_code=400, detail="Company and title are required")
+        monthly_base = payload.get("monthly_base")
+        if monthly_base not in (None, ""):
+            try:
+                monthly_base = float(monthly_base)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Monthly base must be a number")
+        else:
+            monthly_base = None
+        item = {
+            "id": str(payload.get("id") or uuid.uuid4()),
+            "job_id": str(payload.get("job_id") or "").strip() or None,
+            "company": company,
+            "title": title,
+            "currency": str(payload.get("currency") or "USD").strip() or "USD",
+            "monthly_base": monthly_base,
+            "bonus": str(payload.get("bonus") or "").strip() or None,
+            "equity": str(payload.get("equity") or "").strip() or None,
+            "status": str(payload.get("status") or "reviewing").strip() or "reviewing",
+            "note": str(payload.get("note") or "").strip() or None,
+        }
+        result = store.upsert_offer(item)
+        store.audit("offer_saved", {"id": result["id"], "company": company})
+        return result
+
+    @app.post("/api/offers/{offer_id}/advice")
+    def offer_advice(offer_id: str, payload: dict | None = None):
+        profile, _, store = _runtime()
+        offer = next((item for item in store.list_offers(limit=500) if item["id"] == offer_id), None)
+        if offer is None:
+            raise HTTPException(status_code=404, detail="Offer not found")
+        payload = payload or {}
+        context = NegotiationContext(
+            current_offer_monthly=offer.get("monthly_base"),
+            currency=offer.get("currency") or profile.compensation.currency,
+            company_initiated=bool(payload.get("company_initiated", False)),
+            interview_rounds=int(payload.get("interview_rounds", 0) or 0),
+            urgency_signals=int(payload.get("urgency_signals", 0) or 0),
+            strong_positive_signals=int(payload.get("strong_positive_signals", 0) or 0),
+            competing_processes=int(payload.get("competing_processes", 0) or 0),
+            published_max_monthly=payload.get("published_max_monthly"),
+        )
+        return negotiation_advice(profile, context).model_dump()
+
+    @app.get("/api/authority")
+    def authority():
+        _, config, store = _runtime()
+        result = store.get_authority()
+        result["submit"]["config_auto_submit"] = config.application.auto_submit
+        result["submit"]["effective_auto_submit"] = bool(
+            config.application.auto_submit
+            and result["submit"]["enabled"]
+            and not result["submit"]["requires_approval"]
+        )
+        return result
+
+    @app.post("/api/authority/{action}")
+    def update_authority(action: str, payload: dict):
+        _, _, store = _runtime()
+        enabled = payload.get("enabled")
+        requires_approval = payload.get("requires_approval", True)
+        if not isinstance(enabled, bool) or not isinstance(requires_approval, bool):
+            raise HTTPException(
+                status_code=400,
+                detail="enabled and requires_approval must be true or false",
+            )
+        try:
+            return store.set_authority(action, enabled, requires_approval)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    @app.get("/api/notifications")
+    def notifications(limit: int = 100, unread_only: bool = False):
+        _, _, store = _runtime()
+        return store.list_notifications(
+            limit=min(max(limit, 1), 300),
+            unread_only=unread_only,
+        )
+
+    @app.post("/api/notifications/{notification_id}/read")
+    def mark_notification(notification_id: int, payload: dict | None = None):
+        _, _, store = _runtime()
+        is_read = True if payload is None else bool(payload.get("is_read", True))
+        store.mark_notification_read(notification_id, is_read)
+        return {"id": notification_id, "is_read": is_read}
+
+    @app.get("/api/goals")
+    def goals(limit: int = 100):
+        _, _, store = _runtime()
+        return store.list_goals(limit=min(max(limit, 1), 300))
+
+    @app.post("/api/goals")
+    def save_goal(payload: dict):
+        _, _, store = _runtime()
+        label = str(payload.get("label") or "").strip()
+        if not label:
+            raise HTTPException(status_code=400, detail="Goal is required")
+        item = {
+            "id": str(payload.get("id") or uuid.uuid4()),
+            "label": label,
+            "horizon": str(payload.get("horizon") or "now").strip() or "now",
+            "status": str(payload.get("status") or "active").strip() or "active",
+            "note": str(payload.get("note") or "").strip() or None,
+        }
+        result = store.upsert_goal(item)
+        store.audit("career_goal_saved", {"id": result["id"], "label": label})
+        return result
+
+    @app.get("/api/export")
+    def export_data():
+        profile, config, store = _runtime()
+        payload = {
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "profile": profile.model_dump(mode="json"),
+            "settings": {
+                "cycle_minutes": config.cycle_minutes,
+                "auto_submit": config.application.auto_submit,
+            },
+            "jobs": store.list_job_summaries(limit=500),
+            "applications": store.list_application_summaries(limit=500),
+            "feedback": store.list_feedback(limit=500),
+            "contacts": store.list_contacts(limit=500),
+            "interviews": store.list_interviews(limit=500),
+            "offers": store.list_offers(limit=500),
+            "goals": store.list_goals(limit=500),
+            "outreach": store.list_outreach(limit=500),
+            "star_stories": store.list_star_stories(limit=500),
+            "artifacts": store.list_application_artifacts(limit=500),
+            "watch_rules": store.list_watch_rules(limit=500),
+            "authority": store.get_authority(),
+            "activity": store.list_activity(limit=1000),
+        }
+        return JSONResponse(
+            payload,
+            headers={
+                "Content-Disposition": "attachment; filename=jobster-career-export.json"
+            },
+        )
+
+    @app.get("/api/outreach")
+    def outreach(limit: int = 200):
+        _, _, store = _runtime()
+        return store.list_outreach(limit=min(max(limit, 1), 500))
+
+    @app.post("/api/outreach")
+    def save_outreach(payload: dict):
+        _, _, store = _runtime()
+        body = str(payload.get("body") or "").strip()
+        if not body:
+            raise HTTPException(status_code=400, detail="Message body is required")
+        item = {
+            "id": str(payload.get("id") or uuid.uuid4()),
+            "contact_id": str(payload.get("contact_id") or "").strip() or None,
+            "job_id": str(payload.get("job_id") or "").strip() or None,
+            "channel": str(payload.get("channel") or "email").strip() or "email",
+            "subject": str(payload.get("subject") or "").strip() or None,
+            "body": body,
+            "status": str(payload.get("status") or "draft").strip() or "draft",
+            "scheduled_for": str(payload.get("scheduled_for") or "").strip() or None,
+        }
+        result = store.upsert_outreach(item)
+        store.audit("outreach_saved", {"id": result["id"], "status": result["status"]}, job_id=result.get("job_id"))
+        return result
+
+    @app.get("/api/star-stories")
+    def star_stories(limit: int = 200):
+        _, _, store = _runtime()
+        return store.list_star_stories(limit=min(max(limit, 1), 500))
+
+    @app.post("/api/star-stories")
+    def save_star_story(payload: dict):
+        _, _, store = _runtime()
+        title = str(payload.get("title") or "").strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="Story title is required")
+        skills = payload.get("skills") or []
+        if isinstance(skills, str):
+            skills = [item.strip() for item in skills.split(",") if item.strip()]
+        item = {
+            "id": str(payload.get("id") or uuid.uuid4()),
+            "title": title,
+            "situation": str(payload.get("situation") or "").strip() or None,
+            "task": str(payload.get("task") or "").strip() or None,
+            "action": str(payload.get("action") or "").strip() or None,
+            "result": str(payload.get("result") or "").strip() or None,
+            "skills": skills,
+            "status": str(payload.get("status") or "active").strip() or "active",
+        }
+        result = store.upsert_star_story(item)
+        store.audit("star_story_saved", {"id": result["id"], "title": title})
+        return result
+
+    @app.get("/api/artifacts")
+    def artifacts(job_id: str | None = None, limit: int = 300):
+        _, _, store = _runtime()
+        return store.list_application_artifacts(
+            job_id=job_id,
+            limit=min(max(limit, 1), 500),
+        )
+
+    @app.get("/api/watch-rules")
+    def watch_rules(limit: int = 100):
+        _, _, store = _runtime()
+        return store.list_watch_rules(limit=min(max(limit, 1), 300))
+
+    @app.post("/api/watch-rules")
+    def save_watch_rule(payload: dict):
+        _, _, store = _runtime()
+        label = str(payload.get("label") or "").strip()
+        if not label:
+            raise HTTPException(status_code=400, detail="Rule label is required")
+        criteria = payload.get("criteria") or {}
+        if not isinstance(criteria, dict):
+            raise HTTPException(status_code=400, detail="criteria must be an object")
+        item = {
+            "id": str(payload.get("id") or uuid.uuid4()),
+            "label": label,
+            "criteria": criteria,
+            "enabled": bool(payload.get("enabled", True)),
+        }
+        result = store.upsert_watch_rule(item)
+        store.audit("watch_rule_saved", {"id": result["id"], "label": label})
+        return result
+
+    @app.post("/api/emergency-stop")
+    def emergency_stop():
+        _, _, store = _runtime()
+        return store.emergency_stop()
 
     @app.get("/api/jobs")
     def jobs(limit: int = 100, offset: int = 0, include_irrelevant: bool = False):
@@ -401,6 +782,7 @@ def create_app() -> FastAPI:
                 {"name": "Lever", "level": "fill_and_submit"},
                 {"name": "Ashby", "level": "fill_and_submit"},
                 {"name": "Workday", "level": "check_only"},
+                {"name": "Company career forms", "level": "prepare_only"},
             ],
             "auto_apply": config.application.auto_submit,
             "submission_window_open": is_submission_allowed(
@@ -552,6 +934,20 @@ def create_app() -> FastAPI:
         evaluation = JobEvaluation.model_validate(bundle["evaluation"])
         output = Path("artifacts")
         result = build_application_packet(profile, job, evaluation, output)
+        if result.get("resume_markdown"):
+            store.save_application_artifact(
+                job_id,
+                "resume",
+                result["resume_markdown"],
+                "Tailored resume",
+            )
+        if result.get("decision_summary"):
+            store.save_application_artifact(
+                job_id,
+                "decision_summary",
+                result["decision_summary"],
+                "CareerBrain decision summary",
+            )
         store.audit("application_packet_prepared_from_ui", result, job_id=job_id)
         return {**result, "verification": verification_payload}
 

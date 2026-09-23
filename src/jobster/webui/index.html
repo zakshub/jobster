@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="light" />
   <meta name="theme-color" content="#101218" />
   <title>Jobster · Career Command Center</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="stylesheet" href="/assets/styles.css" />
 </head>
 <body>
@@ -36,6 +37,23 @@
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 10v6M12 7h.01"/></symbol>
     <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4zM18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z"/></symbol>
+
+    <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V5l8-2v18M12 8h8v13M7 8h2M7 12h2M7 16h2M15 11h2M15 15h2M3 21h18"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M14 15.5A4.5 4.5 0 0 1 20.5 20"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M7 14h3M14 14h3M7 18h3"/></symbol>
+    <symbol id="i-offer" viewBox="0 0 24 24"><path d="M4 7h16v12H4zM8 7V5h8v2"/><path d="M4 12h16M10 12v2h4v-2"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></symbol>
+    <symbol id="i-thumb" viewBox="0 0 24 24"><path d="M7 10v10H3V10zM7 18h10a2 2 0 0 0 2-1.6l1-5A2 2 0 0 0 18 9h-5l1-4a2 2 0 0 0-3-1L7 10"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><path d="M8 4 4 8l4 4M4 8h15M16 20l4-4-4-4M20 16H5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M4 4h16v13H8l-4 4z"/><path d="M8 9h8M8 13h5"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></symbol>
+    <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10zM13.5 6.5 17 10"/></symbol>
   </svg>
 
   <div class="app-shell">
@@ -63,7 +81,23 @@
           <svg><use href="#i-alert"></use></svg><span>Needs you</span>
           <span class="nav-count nav-count-alert" id="nav-attention">0</span>
         </button>
-        <div class="nav-divider"></div>
+        <div class="nav-label">RELATIONSHIPS</div>
+        <button class="nav-item" data-route="companies">
+          <svg><use href="#i-building"></use></svg><span>Companies</span>
+        </button>
+        <button class="nav-item" data-route="people">
+          <svg><use href="#i-users"></use></svg><span>People</span>
+        </button>
+        <button class="nav-item" data-route="interviews">
+          <svg><use href="#i-calendar"></use></svg><span>Interviews</span>
+        </button>
+        <button class="nav-item" data-route="offers">
+          <svg><use href="#i-offer"></use></svg><span>Offers</span>
+        </button>
+        <div class="nav-label">INTELLIGENCE</div>
+        <button class="nav-item" data-route="insights">
+          <svg><use href="#i-chart"></use></svg><span>Insights</span>
+        </button>
         <button class="nav-item" data-route="brain">
           <svg><use href="#i-brain"></use></svg><span>Career Brain</span>
         </button>
@@ -105,6 +139,10 @@
             <kbd>Ctrl K</kbd>
           </button>
           <div class="quota-mini" id="quota-mini">Searches · —</div>
+          <button class="icon-button notification-button" id="notification-btn" title="Notifications" aria-label="Notifications">
+            <svg><use href="#i-bell"></use></svg>
+            <span class="notification-dot" id="notification-dot"></span>
+          </button>
           <button class="icon-button" id="refresh-btn" title="Refresh data" aria-label="Refresh data">
             <svg><use href="#i-refresh"></use></svg>
           </button>
@@ -170,6 +208,19 @@
             </div>
           </section>
         </div>
+
+        <section class="mission-band">
+          <div class="mission-heading">
+            <span class="mission-kicker">TODAY'S FOCUS</span>
+            <strong id="mission-lead">Jobster is reading the room.</strong>
+            <p id="mission-copy">Your next useful action will appear here.</p>
+          </div>
+          <div class="mission-queue" id="mission-queue"></div>
+          <div class="agent-pulse">
+            <span class="pulse-orb"><i></i></span>
+            <span><strong>Agent pulse</strong><small id="agent-pulse-text">Watching your career signals</small></span>
+          </div>
+        </section>
 
         <div class="metric-grid">
           <button class="metric-card" data-route-jump="opportunities">
@@ -331,6 +382,13 @@
             <div class="empty-state">No applications prepared yet.</div>
           </div>
         </div>
+        <section class="panel artifact-panel">
+          <div class="card-head">
+            <div><div class="eyebrow">APPLICATION FILES</div><h3>What Jobster prepared</h3></div>
+            <span class="authority-note">Resume and decision files are kept with the job</span>
+          </div>
+          <div class="artifact-list" id="artifact-list"></div>
+        </section>
       </section>
 
       <section class="view" id="view-attention">
@@ -351,6 +409,147 @@
             <strong>You are clear.</strong>
             <span>Nothing needs your attention right now.</span>
           </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-companies">
+        <div class="page-intro editorial-intro">
+          <div>
+            <div class="eyebrow">COMPANIES</div>
+            <h2>Follow companies, not just vacancies.</h2>
+            <p>See where good roles keep appearing and keep selected employers on your radar.</p>
+          </div>
+          <button class="button button-secondary" id="companies-refresh"><svg><use href="#i-refresh"></use></svg><span>Refresh view</span></button>
+        </div>
+        <div class="company-layout">
+          <section class="company-watch-column">
+            <div class="section-label">WATCHING</div>
+            <div class="company-stack" id="watched-companies"></div>
+          </section>
+          <section class="company-all-column">
+            <div class="section-label">ALL COMPANIES</div>
+            <div class="company-grid" id="companies-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-people">
+        <div class="page-intro editorial-intro">
+          <div>
+            <div class="eyebrow">PEOPLE</div>
+            <h2>Keep the human side of the job search visible.</h2>
+            <p>Recruiters, hiring contacts and conversations belong next to the opportunities they came from.</p>
+          </div>
+          <button class="button button-primary" id="add-contact-btn"><svg><use href="#i-plus"></use></svg><span>Add contact</span></button>
+        </div>
+        <div class="people-layout">
+          <section class="panel people-panel">
+            <div class="card-head"><div><div class="eyebrow">CONTACTS</div><h3>Your career network</h3></div><span class="count-badge" id="contacts-count">0</span></div>
+            <div class="contact-list" id="contacts-list"></div>
+          </section>
+          <section class="advisor-card">
+            <div class="advisor-art" aria-hidden="true">
+              <span class="advisor-thread thread-a"></span>
+              <span class="advisor-thread thread-b"></span>
+              <span class="advisor-node node-a"></span>
+              <span class="advisor-node node-b"></span>
+              <span class="advisor-node node-c"></span>
+            </div>
+            <div class="eyebrow">MESSAGE ADVISOR</div>
+            <h3>Paste a recruiter message.</h3>
+            <p>Jobster will explain what it means, what to watch for, and draft a clear reply.</p>
+            <textarea id="recruiter-message" rows="6" placeholder="Paste the recruiter message here…"></textarea>
+            <button class="button button-primary" id="analyze-message-btn"><svg><use href="#i-message"></use></svg><span>Understand message</span></button>
+            <div class="advisor-result" id="recruiter-advice"></div>
+          </section>
+        </div>
+        <section class="panel outreach-panel">
+          <div class="card-head">
+            <div><div class="eyebrow">OUTREACH QUEUE</div><h3>Messages prepared, not blindly sent</h3></div>
+            <button class="text-button" id="add-outreach-btn"><svg><use href="#i-plus"></use></svg> Add draft</button>
+          </div>
+          <div class="outreach-list" id="outreach-list"></div>
+        </section>
+      </section>
+
+      <section class="view" id="view-interviews">
+        <div class="page-intro editorial-intro">
+          <div>
+            <div class="eyebrow">INTERVIEWS</div>
+            <h2>Prepare for the conversation, not just the calendar slot.</h2>
+            <p>Keep role context, format, notes and preparation in one place.</p>
+          </div>
+          <button class="button button-primary" id="add-interview-btn"><svg><use href="#i-plus"></use></svg><span>Add interview</span></button>
+        </div>
+        <div class="interview-board" id="interviews-list"></div>
+        <section class="story-bank">
+          <div class="story-bank-head">
+            <div><div class="eyebrow">STAR STORY BANK</div><h3>Real examples you can reuse in interviews.</h3><p>Keep strong work stories structured so the right example is easy to find under pressure.</p></div>
+            <button class="button button-secondary" id="add-story-btn"><svg><use href="#i-plus"></use></svg><span>Add story</span></button>
+          </div>
+          <div class="story-list" id="story-list"></div>
+        </section>
+      </section>
+
+      <section class="view" id="view-offers">
+        <div class="page-intro editorial-intro">
+          <div>
+            <div class="eyebrow">OFFERS</div>
+            <h2>Compare the whole move, not one number.</h2>
+            <p>Track compensation, trade-offs and negotiation room before making a decision.</p>
+          </div>
+          <button class="button button-primary" id="add-offer-btn"><svg><use href="#i-plus"></use></svg><span>Add offer</span></button>
+        </div>
+        <div class="offers-layout">
+          <div class="offer-stack" id="offers-list"></div>
+          <aside class="negotiation-desk" id="negotiation-desk">
+            <div class="desk-handle"></div>
+            <div class="eyebrow">NEGOTIATION DESK</div>
+            <h3>Select an offer to review.</h3>
+            <p>Jobster can suggest a counter and show negotiation room. Final acceptance always stays with you.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" id="view-insights">
+        <div class="page-intro editorial-intro">
+          <div>
+            <div class="eyebrow">CAREER INTELLIGENCE</div>
+            <h2>Patterns hidden inside your job search.</h2>
+            <p>Market signals, salary evidence, recurring gaps, source quality and outcomes — derived from your own Jobster data.</p>
+          </div>
+          <button class="button button-secondary" id="export-data-btn"><svg><use href="#i-download"></use></svg><span>Export career data</span></button>
+        </div>
+
+        <div class="insight-hero">
+          <div class="funnel-story" id="funnel-story"></div>
+          <div class="salary-story" id="salary-story"></div>
+        </div>
+        <div class="insight-grid">
+          <section class="insight-sheet">
+            <div class="sheet-number">01</div>
+            <div class="eyebrow">SOURCE QUALITY</div>
+            <h3>Which sources are finding useful work?</h3>
+            <div id="source-performance"></div>
+          </section>
+          <section class="insight-sheet">
+            <div class="sheet-number">02</div>
+            <div class="eyebrow">ROLE SIGNALS</div>
+            <h3>What role families are appearing?</h3>
+            <div id="role-trends"></div>
+          </section>
+          <section class="insight-sheet">
+            <div class="sheet-number">03</div>
+            <div class="eyebrow">REPEATED GAPS</div>
+            <h3>What keeps showing up between you and strong jobs?</h3>
+            <div id="gap-signals"></div>
+          </section>
+          <section class="insight-sheet">
+            <div class="sheet-number">04</div>
+            <div class="eyebrow">EVIDENCE HEALTH</div>
+            <h3>How well is your career story supported?</h3>
+            <div id="evidence-health"></div>
+          </section>
         </div>
       </section>
 
@@ -410,6 +609,21 @@
             <div class="site-capability-list" id="site-capability-list"></div>
           </section>
 
+          <section class="panel">
+            <div class="card-head">
+              <div><div class="eyebrow">CAREER GOALS</div><h3>What you are moving toward</h3></div>
+              <button class="text-button" id="add-goal-btn"><svg><use href="#i-plus"></use></svg> Add goal</button>
+            </div>
+            <div class="goal-list" id="goals-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="card-head">
+              <div><div class="eyebrow">EVIDENCE</div><h3>What supports your career story</h3></div>
+            </div>
+            <div class="evidence-summary" id="evidence-summary"></div>
+          </section>
+
           <section class="panel panel-wide">
             <div class="card-head">
               <div><div class="eyebrow">HOW DECISIONS WORK</div><h3>Simple rules, visible outcomes</h3></div>
@@ -457,6 +671,24 @@
             <div class="settings-list" id="settings-apps"></div>
           </section>
           <section class="panel">
+            <div class="card-head">
+              <div><div class="eyebrow">WATCH RULES</div><h3>Things worth watching for</h3></div>
+              <button class="text-button" id="add-watch-rule-btn"><svg><use href="#i-plus"></use></svg> Add rule</button>
+            </div>
+            <div class="watch-rule-list" id="watch-rule-list"></div>
+          </section>
+
+          <section class="panel emergency-panel">
+            <div class="card-head"><div><div class="eyebrow">EMERGENCY CONTROL</div><h3>Stop every automatic action</h3></div></div>
+            <div class="emergency-copy">
+              <span class="principle-icon coral"><svg><use href="#i-alert"></use></svg></span>
+              <div><strong>Emergency stop</strong><p>Turns off searching, preparation, submission, contact and follow-up permissions. Nothing is deleted.</p></div>
+            </div>
+            <button class="button emergency-button" id="emergency-stop-btn">Stop automation</button>
+          </section>
+
+
+          <section class="panel">
             <div class="card-head"><div><div class="eyebrow">INTERFACE</div><h3>Your display preferences</h3></div></div>
             <div class="preference-controls">
               <label class="switch-row"><span><strong>Reduce motion</strong><small>Use fewer animations.</small></span><input type="checkbox" id="pref-motion"><i></i></label>
@@ -464,6 +696,14 @@
               <label class="switch-row"><span><strong>Open live job search automatically</strong><small>Show the live window when a search starts.</small></span><input type="checkbox" id="pref-terminal" checked><i></i></label>
             </div>
           </section>
+          <section class="panel panel-wide authority-panel">
+            <div class="card-head">
+              <div><div class="eyebrow">AUTHORITY CENTER</div><h3>What Jobster is allowed to do</h3></div>
+              <span class="authority-note">Permission-bound automation</span>
+            </div>
+            <div class="authority-grid" id="authority-grid"></div>
+          </section>
+
           <section class="panel">
             <div class="card-head"><div><div class="eyebrow">PRIVACY</div><h3>What stays private</h3></div></div>
             <div class="privacy-card">
@@ -507,6 +747,12 @@
         <div class="detail-label">What matches well</div>
         <div class="tag-list" id="drawer-matches"></div>
       </section>
+      <section class="detail-section intelligence-detail">
+        <div class="detail-label">How Jobster reached this view</div>
+        <div class="confidence-line"><span>Confidence</span><strong id="drawer-confidence">—</strong></div>
+        <div class="requirement-list" id="drawer-requirements"></div>
+        <div class="career-value-strip" id="drawer-career-value"></div>
+      </section>
       <section class="detail-section">
         <div class="detail-label">What may be missing or unclear</div>
         <div class="tag-list muted" id="drawer-gaps"></div>
@@ -514,6 +760,16 @@
       <section class="detail-section">
         <div class="detail-label">What to do next</div>
         <p id="drawer-next">—</p>
+      </section>
+      <section class="detail-section feedback-section">
+        <div class="detail-label">Teach Jobster</div>
+        <p class="feedback-help">Your feedback improves future recommendations without silently changing your career model.</p>
+        <div class="feedback-actions">
+          <button data-feedback="interesting"><svg><use href="#i-thumb"></use></svg><span>Interesting</span></button>
+          <button data-feedback="would_apply"><svg><use href="#i-check"></use></svg><span>I would apply</span></button>
+          <button data-feedback="outside_direction"><svg><use href="#i-compass"></use></svg><span>Wrong direction</span></button>
+          <button data-feedback="salary_too_low"><svg><use href="#i-offer"></use></svg><span>Pay too low</span></button>
+        </div>
       </section>
       <section class="detail-section verification-detail">
         <div class="detail-label">Is this job still live?</div>
@@ -529,6 +785,7 @@
       </section>
 
       <div class="drawer-actions">
+        <button class="button button-secondary" id="compare-job-btn"><svg><use href="#i-compare"></use></svg><span>Compare</span></button>
         <button class="button button-secondary" id="verify-job-btn"><svg><use href="#i-shield"></use></svg><span>Check job</span></button>
         <button class="button button-secondary" id="open-job-btn"><svg><use href="#i-external"></use></svg><span>Open job page</span></button>
         <button class="button button-primary" id="prepare-job-btn"><svg><use href="#i-briefcase"></use></svg><span>Prepare application</span></button>
@@ -556,6 +813,29 @@
     </div>
   </section>
   <button class="terminal-reopen" id="terminal-reopen"><svg><use href="#i-terminal"></use></svg> Open live job search</button>
+
+  <aside class="notification-panel" id="notification-panel" aria-hidden="true">
+    <div class="notification-head"><div><div class="eyebrow">NOTIFICATIONS</div><h3>What changed</h3></div><button class="icon-button" id="notification-close"><svg><use href="#i-x"></use></svg></button></div>
+    <div class="notification-list" id="notification-list"></div>
+  </aside>
+
+  <section class="compare-tray" id="compare-tray">
+    <div class="compare-tray-copy"><span class="compare-count" id="compare-count">0</span><strong>Compare jobs</strong><small>Select up to four.</small></div>
+    <div class="compare-chips" id="compare-chips"></div>
+    <button class="button button-primary" id="open-compare-btn">Compare</button>
+    <button class="icon-button" id="clear-compare-btn" aria-label="Clear comparison"><svg><use href="#i-x"></use></svg></button>
+  </section>
+
+  <div class="modal-backdrop" id="modal-backdrop"></div>
+  <section class="form-modal" id="entity-modal" aria-hidden="true">
+    <header><div><div class="eyebrow" id="entity-modal-kicker">ADD</div><h3 id="entity-modal-title">Add item</h3></div><button class="icon-button" id="entity-modal-close"><svg><use href="#i-x"></use></svg></button></header>
+    <form id="entity-form" class="entity-form"></form>
+  </section>
+
+  <section class="compare-modal" id="compare-modal" aria-hidden="true">
+    <header><div><div class="eyebrow">COMPARE</div><h3>Opportunity comparison</h3></div><button class="icon-button" id="compare-modal-close"><svg><use href="#i-x"></use></svg></button></header>
+    <div class="compare-table-wrap" id="compare-table-wrap"></div>
+  </section>
 
   <div class="command-backdrop" id="command-backdrop"></div>
   <section class="command-palette" id="command-palette" aria-hidden="true">

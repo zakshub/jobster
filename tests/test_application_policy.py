@@ -35,3 +35,31 @@ def test_sensitive_classifier():
     assert sensitive_category("Will you now or in the future require visa sponsorship?") == "sponsorship"
     assert sensitive_category("Portfolio URL") is None
     assert normalize_question("Portfolio URL") == "portfolio_url"
+
+
+def test_plan_keeps_other_approved_answers_for_later_pages():
+    job = Job(id="later", title="Designer", company="Acme", description="x")
+    questions = [
+        ApplicationQuestion(
+            key="full_name",
+            label="Full name",
+            required=True,
+        )
+    ]
+    answers = [
+        ApplicationAnswer(
+            key="full_name",
+            value="Candidate",
+            verified=True,
+            allow_automatic_use=True,
+        ),
+        ApplicationAnswer(
+            key="notice_period",
+            value="30 days",
+            aliases=["Notice period"],
+            verified=True,
+            allow_automatic_use=True,
+        ),
+    ]
+    plan = build_application_plan(job, questions, answers, allow_final_submit=True)
+    assert plan.known_answers["notice_period"] == "30 days"

@@ -28,7 +28,7 @@ def parse_remoteok(payload: list[dict]) -> list[Job]:
                 location=location,
                 remote=True,
                 source="remoteok",
-                url=item.get("url") or item.get("apply_url"),
+                url=item.get("apply_url") or item.get("url"),
             )
         )
     return jobs
