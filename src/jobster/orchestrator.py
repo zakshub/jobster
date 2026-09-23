@@ -25,6 +25,13 @@ def process_applications(
 ) -> dict:
     by_job = {job.id: job for job in jobs}
     answer_bank = load_answer_bank(config.application.answer_bank_path)
+    authority = store.get_authority()
+    prepare_authorized = authority.get("prepare", {}).get("enabled", True)
+    submit_rule = authority.get("submit", {})
+    submit_authorized = bool(
+        submit_rule.get("enabled", False)
+        and not submit_rule.get("requires_approval", True)
+    )
     submission_window_open = is_submission_allowed(
         config.application.submission_schedule
     )
@@ -37,6 +44,8 @@ def process_applications(
         "unsupported": 0,
         "errors": 0,
         "submission_window_open": submission_window_open,
+        "prepare_authorized": prepare_authorized,
+        "submit_authorized": submit_authorized,
     }
     submitted_this_cycle = 0
 
@@ -46,6 +55,23 @@ def process_applications(
 
         summary["considered"] += 1
         job = by_job[evaluation.job_id]
+
+        if not prepare_authorized:
+            plan = ApplicationPlan(
+                job_id=job.id,
+                ats="unknown",
+                state=ApplicationState.SHORTLISTED,
+                reasons=["Automatic application preparation is turned off in the Authority Center"],
+            )
+            store.save_application_plan(plan)
+            store.audit(
+                "application_preparation_paused",
+                {"reason": "prepare_authority_off"},
+                job_id=job.id,
+            )
+            summary["ready"] += 1
+            continue
+
         executor = get_executor(job)
 
         if executor is None:
@@ -64,6 +90,7 @@ def process_applications(
             questions = executor.inspect_questions(job)
             allow_submit = (
                 config.application.auto_submit
+                and submit_authorized
                 and submission_window_open
                 and executor.capability.can_submit
                 and submitted_this_cycle < config.application.max_submissions_per_cycle
@@ -74,6 +101,16 @@ def process_applications(
                 answer_bank,
                 allow_final_submit=allow_submit,
             )
+
+            if config.application.auto_submit and not submit_authorized:
+                plan.reasons.append(
+                    "Final submission is not authorized in the Authority Center"
+                )
+                store.audit(
+                    "application_submission_not_authorized",
+                    {"authority": submit_rule},
+                    job_id=job.id,
+                )
 
             if config.application.auto_submit and not submission_window_open:
                 plan.reasons.append(
