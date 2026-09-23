@@ -5,7 +5,8 @@ from .application_policy import build_application_plan
 from .application_target import resolve_application_target
 from .executors.browser_form import BrowserExecutionError
 from .executors.registry import get_executor
-from .models import ApplicationPlan, ApplicationState, Job, JobEvaluation, PursuitDecision
+from .field_keys import normalize_question
+from .models import ApplicationPlan, ApplicationQuestion, ApplicationState, Job, JobEvaluation, PursuitDecision
 from .settings import SearchConfig
 from .storage import JobsterStore
 from .submission_schedule import is_submission_allowed
@@ -166,17 +167,57 @@ def process_applications(
 
             receipt = executor.execute(application_job, plan)
             store.save_receipt(job.id, receipt)
-            submitted_this_cycle += 1
+            receipt_status = str(receipt.get("status") or "needs_verification")
 
-            if receipt.get("status") == "submitted_confirmed":
+            if receipt_status == "submitted_confirmed":
+                submitted_this_cycle += 1
                 plan.state = ApplicationState.SUBMITTED
                 summary["submitted_confirmed"] += 1
-            else:
+                screenshot = receipt.get("confirmation_screenshot")
+                if screenshot:
+                    store.save_application_artifact(
+                        job.id,
+                        "submission_proof",
+                        str(screenshot),
+                        "Submission confirmation screenshot",
+                    )
+            elif receipt_status == "blocked_new_question":
+                plan.state = ApplicationState.BLOCKED
+                labels = [
+                    str(label)
+                    for label in receipt.get("new_required_questions", [])
+                    if str(label).strip()
+                ]
+                for label in labels:
+                    plan.unknown_questions.append(
+                        ApplicationQuestion(
+                            key=normalize_question(label),
+                            label=label,
+                            required=True,
+                        )
+                    )
+                plan.reasons.append(
+                    "A later application page asked required questions that do not have approved answers"
+                )
+                summary["blocked"] += 1
+            elif receipt_status == "human_required":
                 plan.state = ApplicationState.BLOCKED
                 plan.reasons.append(
-                    "Submit action occurred but success confirmation was not detected"
+                    str(receipt.get("reason") or "A human check is required before continuing")
+                )
+                summary["blocked"] += 1
+            else:
+                if receipt.get("final_action_label"):
+                    submitted_this_cycle += 1
+                plan.state = ApplicationState.BLOCKED
+                plan.reasons.append(
+                    str(
+                        receipt.get("reason")
+                        or "Jobster could not confirm the final application result"
+                    )
                 )
                 summary["needs_verification"] += 1
+
             store.save_application_plan(plan)
             store.audit("application_execution", receipt, job_id=job.id)
 
