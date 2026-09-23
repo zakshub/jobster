@@ -4,6 +4,7 @@ from .brain import CareerBrain
 from .discovery import discover
 from .models import CareerProfile, PursuitDecision
 from .orchestrator import process_applications
+from .quota import SerpApiQuota
 from .semantic import SemanticCareerBrain
 from .settings import SearchConfig
 from .sources import (
@@ -40,11 +41,23 @@ def build_sources(config: SearchConfig) -> list[JobSource]:
             )
         )
 
+    quota = None
+    if config.sources.google_jobs.enabled or config.sources.web_search.enabled:
+        budget = config.serpapi_budget
+        quota = SerpApiQuota(
+            path=budget.state_path,
+            monthly_limit=budget.monthly_limit,
+            reserve_queries=budget.reserve_queries,
+            daily_limit=budget.daily_limit,
+            window_days=budget.window_days,
+        )
+
     if config.sources.google_jobs.enabled:
         sources.append(
             SerpApiGoogleJobsSource(
                 query=config.sources.google_jobs.query,
                 location=config.sources.google_jobs.location,
+                quota=quota,
             )
         )
 
@@ -56,6 +69,7 @@ def build_sources(config: SearchConfig) -> list[JobSource]:
                 group_size=config.sources.web_search.group_size,
                 results_per_group=config.sources.web_search.results_per_group,
                 cache_hours=config.sources.web_search.cache_hours,
+                quota=quota,
             )
         )
 
