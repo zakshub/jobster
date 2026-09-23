@@ -22,9 +22,17 @@ class SourcesConfig(BaseModel):
     google_jobs: GoogleJobsConfig = Field(default_factory=lambda: GoogleJobsConfig(enabled=False))
 
 
+class ApplicationConfig(BaseModel):
+    auto_submit: bool = False
+    semantic_reasoning: bool = True
+    answer_bank_path: str = "private_data/answer_bank.yaml"
+    max_submissions_per_cycle: int = Field(default=5, ge=0, le=25)
+
+
 class SearchConfig(BaseModel):
     cycle_minutes: int = Field(default=60, ge=15)
     sources: SourcesConfig = Field(default_factory=SourcesConfig)
+    application: ApplicationConfig = Field(default_factory=ApplicationConfig)
 
 
 def load_search_config(path: str | Path) -> SearchConfig:

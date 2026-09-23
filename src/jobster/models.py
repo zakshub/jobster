@@ -216,6 +216,7 @@ class ApplicationState(str, Enum):
 class ApplicationAnswer(BaseModel):
     key: str
     value: str
+    aliases: list[str] = Field(default_factory=list)
     verified: bool = False
     sensitivity: Literal["normal", "sensitive", "restricted"] = "normal"
     allow_automatic_use: bool = False

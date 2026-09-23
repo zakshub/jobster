@@ -1,0 +1,45 @@
+answers:
+  - key: full_name
+    value: Example Candidate
+    aliases:
+      - name
+      - legal name
+    verified: true
+    sensitivity: normal
+    allow_automatic_use: true
+
+  - key: email
+    value: candidate@example.com
+    aliases:
+      - email address
+    verified: true
+    sensitivity: normal
+    allow_automatic_use: true
+
+  - key: portfolio_url
+    value: https://example.com
+    aliases:
+      - portfolio
+      - website
+      - portfolio website
+    verified: true
+    sensitivity: normal
+    allow_automatic_use: true
+
+  - key: work_authorization
+    value: ""
+    aliases:
+      - are you authorized to work
+      - right to work
+    verified: false
+    sensitivity: restricted
+    allow_automatic_use: false
+
+  - key: visa_sponsorship
+    value: ""
+    aliases:
+      - sponsorship
+      - visa sponsorship
+    verified: false
+    sensitivity: restricted
+    allow_automatic_use: false

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from .answer_bank import answer_lookup
 from .models import ApplicationAnswer, ApplicationPlan, ApplicationQuestion, ApplicationState, Job
 from .ats import detect_ats
 
@@ -36,14 +37,14 @@ def build_application_plan(
     answer_bank: list[ApplicationAnswer],
     allow_final_submit: bool = False,
 ) -> ApplicationPlan:
-    answers_by_key = {answer.key: answer for answer in answer_bank}
+    answers_by_key = answer_lookup(answer_bank)
     known: dict[str, str] = {}
     blocked: list[ApplicationQuestion] = []
     unknown: list[ApplicationQuestion] = []
     reasons: list[str] = []
 
     for question in questions:
-        key = question.key or normalize_question(question.label)
+        key = normalize_question(question.key or question.label)
         category = sensitive_category(question.label)
         answer = answers_by_key.get(key)
 
@@ -54,7 +55,7 @@ def build_application_plan(
                 continue
 
         if answer and answer.verified and answer.allow_automatic_use:
-            known[key] = answer.value
+            known[question.key] = answer.value
         elif question.required:
             unknown.append(question)
             reasons.append(f"Required question has no approved answer: {question.label}")

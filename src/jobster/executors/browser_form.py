@@ -34,68 +34,72 @@ class BrowserFormExecutor(ApplicationExecutor):
             ) from exc
         return sync_playwright
 
+    def _captcha_present(self, page) -> bool:
+        return bool(page.locator("iframe[title*='captcha' i], iframe[src*='captcha' i], [class*='captcha' i]").count())
+
+    def _inspect_page(self, page) -> list[ApplicationQuestion]:
+        questions: list[ApplicationQuestion] = []
+        fields = page.locator("input, textarea, select")
+        for index in range(fields.count()):
+            field = fields.nth(index)
+            tag = field.evaluate("el => el.tagName.toLowerCase()")
+            input_type = field.get_attribute("type") or tag
+            if input_type in {"hidden", "submit", "button", "reset"}:
+                continue
+
+            field_id = field.get_attribute("id")
+            name = field.get_attribute("name")
+            aria = field.get_attribute("aria-label")
+            placeholder = field.get_attribute("placeholder")
+
+            label = ""
+            if field_id:
+                label_node = page.locator(f"label[for='{field_id}']")
+                if label_node.count():
+                    label = label_node.first.inner_text().strip()
+            if not label:
+                parent_label = field.locator("xpath=ancestor::label[1]")
+                if parent_label.count():
+                    label = parent_label.first.inner_text().strip()
+            if not label:
+                label = aria or placeholder or name or field_id or f"field_{index}"
+
+            selector = None
+            if field_id:
+                selector = f"#{field_id}"
+            elif name:
+                selector = f"[name='{name}']"
+
+            required = field.get_attribute("required") is not None or field.get_attribute("aria-required") == "true"
+            options = field.locator("option").all_inner_texts() if tag == "select" else []
+
+            questions.append(
+                ApplicationQuestion(
+                    key=normalize_question(label),
+                    label=label,
+                    required=required,
+                    input_type=input_type,
+                    options=options,
+                    selector=selector,
+                )
+            )
+        return questions
+
     def inspect_questions(self, job: Job) -> list[ApplicationQuestion]:
         if not job.url:
             raise BrowserExecutionError("Job has no application URL")
 
         sync_playwright = self._playwright()
-        questions: list[ApplicationQuestion] = []
-
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             page.goto(job.url, wait_until="domcontentloaded", timeout=60000)
-
-            if page.locator("iframe[title*='captcha' i], iframe[src*='captcha' i], [class*='captcha' i]").count():
+            if self._captcha_present(page):
                 browser.close()
                 raise BrowserExecutionError("CAPTCHA detected. Human input is required")
-
-            fields = page.locator("input, textarea, select")
-            for index in range(fields.count()):
-                field = fields.nth(index)
-                tag = field.evaluate("el => el.tagName.toLowerCase()")
-                input_type = field.get_attribute("type") or tag
-                if input_type in {"hidden", "submit", "button", "reset"}:
-                    continue
-
-                field_id = field.get_attribute("id")
-                name = field.get_attribute("name")
-                aria = field.get_attribute("aria-label")
-                placeholder = field.get_attribute("placeholder")
-
-                label = ""
-                if field_id:
-                    label_node = page.locator(f"label[for='{field_id}']")
-                    if label_node.count():
-                        label = label_node.first.inner_text().strip()
-                if not label:
-                    label = aria or placeholder or name or field_id or f"field_{index}"
-
-                selector = None
-                if field_id:
-                    selector = f"#{field_id}"
-                elif name:
-                    selector = f"[name='{name}']"
-
-                required = field.get_attribute("required") is not None or field.get_attribute("aria-required") == "true"
-                options = []
-                if tag == "select":
-                    options = field.locator("option").all_inner_texts()
-
-                questions.append(
-                    ApplicationQuestion(
-                        key=normalize_question(label),
-                        label=label,
-                        required=required,
-                        input_type=input_type,
-                        options=options,
-                        selector=selector,
-                    )
-                )
-
+            questions = self._inspect_page(page)
             browser.close()
-
-        return questions
+            return questions
 
     def execute(self, job: Job, plan: ApplicationPlan) -> dict:
         if not plan.can_submit_automatically:
@@ -109,11 +113,11 @@ class BrowserFormExecutor(ApplicationExecutor):
             page = browser.new_page()
             page.goto(job.url, wait_until="domcontentloaded", timeout=60000)
 
-            if page.locator("iframe[title*='captcha' i], iframe[src*='captcha' i], [class*='captcha' i]").count():
+            if self._captcha_present(page):
                 browser.close()
                 raise BrowserExecutionError("CAPTCHA detected. Human input is required")
 
-            questions = self.inspect_questions(job)
+            questions = self._inspect_page(page)
             by_key = {question.key: question for question in questions}
             filled = []
 

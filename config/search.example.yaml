@@ -11,3 +11,9 @@ sources:
     enabled: false
     query: remote senior product designer OR ux architect OR product designer
     location: Pakistan
+
+application:
+  semantic_reasoning: true
+  auto_submit: false
+  answer_bank_path: private_data/answer_bank.yaml
+  max_submissions_per_cycle: 5

@@ -35,6 +35,13 @@ CREATE TABLE IF NOT EXISTS application_plans (
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
+CREATE TABLE IF NOT EXISTS automation_receipts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS audit_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id TEXT,
@@ -97,6 +104,13 @@ class JobsterStore:
                   payload_json=excluded.payload_json,
                   updated_at=CURRENT_TIMESTAMP""",
                 (plan.job_id, plan.state.value, plan.ats, plan.model_dump_json()),
+            )
+
+    def save_receipt(self, job_id: str, receipt: dict) -> None:
+        with self.connect() as con:
+            con.execute(
+                "INSERT INTO automation_receipts(job_id, status, payload_json) VALUES (?, ?, ?)",
+                (job_id, str(receipt.get("status", "unknown")), json.dumps(receipt, sort_keys=True)),
             )
 
     def audit(self, event_type: str, payload: dict, job_id: str | None = None) -> None:
