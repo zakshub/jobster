@@ -888,6 +888,7 @@ function renderInsights() {
   if (!insights) return;
 
   const funnel = insights.funnel || {};
+  const bottleneck = insights.bottleneck || {};
   const funnelPairs = [
     ["Found", funnel.found],
     ["Reviewed", funnel.reviewed],
@@ -900,6 +901,7 @@ function renderInsights() {
   $("funnel-story").innerHTML = `
     <div class="story-title">Your opportunity funnel</div>
     <div class="story-copy">Where your job search is creating movement — and where it may be slowing down.</div>
+    <div class="diagnosis-note"><strong>${esc(bottleneck.title || "The funnel is still building.")}</strong><span>${esc(bottleneck.detail || "")}</span></div>
     <div class="funnel-line">
       ${funnelPairs.map(([label,value]) => `
         <div class="funnel-step">
