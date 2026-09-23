@@ -241,5 +241,37 @@ def run_cycle(
         "ai_review_reason": semantic_pause["message"] if semantic_pause else None,
     }
     store.audit("discovery_cycle_completed", summary)
+
+    strong_count = (
+        counts.get("apply", 0)
+        + counts.get("high_priority", 0)
+        + counts.get("aggressive_pursuit", 0)
+    )
+    if strong_count:
+        store.add_notification(
+            "success",
+            "New strong job matches",
+            f"Jobster found {strong_count} job{'s' if strong_count != 1 else ''} worth a closer look.",
+        )
+    if summary.get("ai_review_paused"):
+        store.add_notification(
+            "warning",
+            "Advanced job review paused",
+            summary.get("ai_review_reason")
+            or "Jobster continued with its built-in basic review.",
+        )
+    if applications.get("blocked", 0):
+        store.add_notification(
+            "warning",
+            "Applications need your input",
+            f"{applications['blocked']} application{'s' if applications['blocked'] != 1 else ''} stopped instead of guessing an answer.",
+        )
+    if applications.get("submitted_confirmed", 0):
+        store.add_notification(
+            "success",
+            "Application submitted",
+            f"{applications['submitted_confirmed']} application{'s were' if applications['submitted_confirmed'] != 1 else ' was'} confirmed as submitted.",
+        )
+
     emit("cycle_completed", summary)
     return summary
