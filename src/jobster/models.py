@@ -169,3 +169,48 @@ class ModelUpdateProposal(BaseModel):
     proposed_confidence: float | None = Field(default=None, ge=0, le=1)
     alternative_explanations: list[str] = Field(default_factory=list)
     status: Literal["draft", "pending_review", "approved", "rejected", "merged"] = "draft"
+
+
+class ApplicationState(str, Enum):
+    DISCOVERED = "discovered"
+    NORMALIZED = "normalized"
+    EVALUATED = "evaluated"
+    REJECTED = "rejected"
+    SHORTLISTED = "shortlisted"
+    PREPARING = "preparing"
+    BLOCKED = "blocked"
+    READY = "ready"
+    SUBMITTED = "submitted"
+    FAILED = "failed"
+    RECRUITER_CONTACTED = "recruiter_contacted"
+    INTERVIEWING = "interviewing"
+    OFFER = "offer"
+    NEGOTIATING = "negotiating"
+    CLOSED = "closed"
+
+
+class ApplicationAnswer(BaseModel):
+    key: str
+    value: str
+    verified: bool = False
+    sensitivity: Literal["normal", "sensitive", "restricted"] = "normal"
+    allow_automatic_use: bool = False
+
+
+class ApplicationQuestion(BaseModel):
+    key: str
+    label: str
+    required: bool = False
+    input_type: str = "text"
+    options: list[str] = Field(default_factory=list)
+
+
+class ApplicationPlan(BaseModel):
+    job_id: str
+    ats: str
+    state: ApplicationState
+    known_answers: dict[str, str] = Field(default_factory=dict)
+    blocked_questions: list[ApplicationQuestion] = Field(default_factory=list)
+    unknown_questions: list[ApplicationQuestion] = Field(default_factory=list)
+    can_submit_automatically: bool = False
+    reasons: list[str] = Field(default_factory=list)
