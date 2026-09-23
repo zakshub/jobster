@@ -37,9 +37,38 @@ def test_enterprise_navigation_is_present():
         "opportunities",
         "applications",
         "attention",
+        "companies",
+        "people",
+        "interviews",
+        "offers",
+        "insights",
         "brain",
         "activity",
         "settings",
     ):
         assert f'data-route="{route}"' in html
         assert f'id="view-{route}"' in html
+
+
+def test_pwa_assets_are_referenced():
+    html = HTML.read_text(encoding="utf-8")
+    assert 'rel="manifest"' in html
+    assert "/manifest.webmanifest" in html
+
+
+def test_omni_career_surfaces_are_present():
+    html = HTML.read_text(encoding="utf-8")
+    for element_id in (
+        "mission-queue",
+        "authority-grid",
+        "companies-list",
+        "contacts-list",
+        "interviews-list",
+        "offers-list",
+        "funnel-story",
+        "notification-panel",
+        "compare-tray",
+        "entity-modal",
+        "compare-modal",
+    ):
+        assert f'id="{element_id}"' in html
