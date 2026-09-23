@@ -2790,3 +2790,12 @@ body::before {
 @media (max-width: 560px) {
   .career-value-strip { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
+
+.diagnosis-note {
+  margin-top: 12px;
+  padding: 9px 10px;
+  border-left: 2px solid var(--coral);
+  background: rgba(228,111,93,.055);
+}
+.diagnosis-note strong { display: block; font-size: 8px; line-height: 13px; }
+.diagnosis-note span { display: block; margin-top: 2px; color: var(--ink-500); font-size: 7px; line-height: 12px; }
