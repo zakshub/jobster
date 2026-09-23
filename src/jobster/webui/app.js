@@ -561,7 +561,52 @@ function renderSourceOptions() {
   select.value = state.sourceFilter;
 }
 
+
+function relativeAge(value) {
+  if (!value) return null;
+  const date = new Date(value.includes("T") ? value : value.replace(" ", "T") + "Z");
+  if (Number.isNaN(date.getTime())) return null;
+  const diff = Math.max(0, Date.now() - date.getTime());
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 1) return "updated recently";
+  if (hours < 24) return `updated ${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `updated ${days}d ago`;
+  return `updated ${Math.floor(days / 30)}mo ago`;
+}
+
+function parseJobQuery(query) {
+  const raw = String(query || "").trim();
+  const lower = raw.toLowerCase();
+  const result = {
+    text: lower,
+    saved: /\bsaved\b/.test(lower),
+    live: /\blive\b/.test(lower) || /\bverified\b/.test(lower),
+    remote: /\bremote\b/.test(lower),
+    company: null,
+    source: null,
+    minimumPay: null,
+  };
+  const companyMatch = lower.match(/company:([^\s]+)/);
+  const sourceMatch = lower.match(/source:([^\s]+)/);
+  const payMatch = lower.match(/(?:over|above|>=)\s*\$?([0-9][0-9,]*)/);
+  if (companyMatch) result.company = companyMatch[1].replaceAll("_", " ");
+  if (sourceMatch) result.source = sourceMatch[1].replaceAll("_", " ");
+  if (payMatch) result.minimumPay = Number(payMatch[1].replaceAll(",", ""));
+  result.text = lower
+    .replace(/\bsaved\b/g, "")
+    .replace(/\blive\b|\bverified\b/g, "")
+    .replace(/\bremote\b/g, "")
+    .replace(/company:[^\s]+/g, "")
+    .replace(/source:[^\s]+/g, "")
+    .replace(/(?:over|above|>=)\s*\$?[0-9][0-9,]*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return result;
+}
+
 function filteredJobs() {
+  const smartQuery = parseJobQuery(state.query);
   let jobs = state.jobs.filter((job) => {
     if ((job.dismissed || job.archived) && state.filter !== "saved") return false;
     if (state.filter === "high_priority" && !["high_priority", "aggressive_pursuit"].includes(job.decision)) return false;
@@ -570,8 +615,17 @@ function filteredJobs() {
     if (state.filter === "saved" && !job.saved) return false;
     if (state.filter === "verified" && job.verification_state !== "live") return false;
     if (state.sourceFilter !== "all" && job.source !== state.sourceFilter) return false;
+    if (smartQuery.saved && !job.saved) return false;
+    if (smartQuery.live && job.verification_state !== "live") return false;
+    if (smartQuery.remote && !job.remote && !String(job.location || "").toLowerCase().includes("remote")) return false;
+    if (smartQuery.company && !String(job.company || "").toLowerCase().includes(smartQuery.company)) return false;
+    if (smartQuery.source && !String(job.source || "").toLowerCase().includes(smartQuery.source)) return false;
+    if (smartQuery.minimumPay) {
+      const pay = Number(job.salary_max_monthly || job.salary_min_monthly || 0);
+      if (pay < smartQuery.minimumPay) return false;
+    }
     const haystack = `${job.title} ${job.company} ${job.source} ${job.location || ""}`.toLowerCase();
-    if (state.query && !haystack.includes(state.query.toLowerCase())) return false;
+    if (smartQuery.text && !haystack.includes(smartQuery.text)) return false;
     return true;
   });
 
@@ -654,7 +708,7 @@ function renderJobs() {
   const jobs = filteredJobs();
   $("opportunity-count").textContent = jobs.length;
   $("results-summary").textContent = jobs.length
-    ? `${jobs.length} suitable job${jobs.length === 1 ? "" : "s"} shown`
+    ? `${jobs.length} suitable job${jobs.length === 1 ? "" : "s"} shown${state.query ? " · smart search active" : ""}`
     : "No jobs match these filters.";
   $("jobs-list").innerHTML = jobs.length
     ? jobs.map((job, index) => jobCard(job, index)).join("")
