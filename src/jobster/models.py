@@ -203,6 +203,7 @@ class ApplicationQuestion(BaseModel):
     required: bool = False
     input_type: str = "text"
     options: list[str] = Field(default_factory=list)
+    selector: str | None = None
 
 
 class ApplicationPlan(BaseModel):
