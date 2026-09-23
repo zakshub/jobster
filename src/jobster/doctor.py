@@ -4,6 +4,7 @@ import importlib.util
 import os
 from pathlib import Path
 
+from .quota import SerpApiQuota
 from .settings import load_search_config
 
 
@@ -51,6 +52,26 @@ def doctor(
                     "ok": bool(os.getenv("SERPAPI_API_KEY")),
                     "detail": (
                         "Required because Google Jobs or expanded web search is enabled"
+                    ),
+                }
+            )
+            budget = config.serpapi_budget
+            quota = SerpApiQuota(
+                path=budget.state_path,
+                monthly_limit=budget.monthly_limit,
+                reserve_queries=budget.reserve_queries,
+                daily_limit=budget.daily_limit,
+                window_days=budget.window_days,
+            )
+            status = quota.status()
+            checks.append(
+                {
+                    "name": "serpapi_budget",
+                    "ok": True,
+                    "detail": (
+                        f"{status.used_in_window}/{status.usable_limit} usable queries "
+                        f"in {budget.window_days}-day window; "
+                        f"today {status.used_today}/{status.daily_limit}"
                     ),
                 }
             )

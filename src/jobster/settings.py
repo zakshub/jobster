@@ -43,7 +43,22 @@ class WebSearchConfig(SourceToggle):
     sites: list[str] = Field(default_factory=lambda: list(WEB_SEARCH_DOMAINS))
     group_size: int = Field(default=6, ge=1, le=10)
     results_per_group: int = Field(default=10, ge=1, le=20)
-    cache_hours: float = Field(default=6, ge=1, le=168)
+    cache_hours: float = Field(default=24, ge=1, le=168)
+
+
+class SerpApiBudgetConfig(BaseModel):
+    monthly_limit: int = Field(default=250, ge=1)
+    reserve_queries: int = Field(default=25, ge=0)
+    daily_limit: int = Field(default=7, ge=1)
+    window_days: int = Field(default=30, ge=1)
+    state_path: str = "data/serpapi_quota.json"
+
+
+class SubmissionScheduleConfig(BaseModel):
+    enabled: bool = True
+    timezone: str = "Asia/Karachi"
+    friday_stop_time: str = Field(default="18:00", pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+    monday_resume_time: str = Field(default="09:00", pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 
 
 class SourcesConfig(BaseModel):
@@ -64,10 +79,14 @@ class ApplicationConfig(BaseModel):
     semantic_reasoning: bool = True
     answer_bank_path: str = "private_data/answer_bank.yaml"
     max_submissions_per_cycle: int = Field(default=5, ge=0, le=25)
+    submission_schedule: SubmissionScheduleConfig = Field(
+        default_factory=SubmissionScheduleConfig
+    )
 
 
 class SearchConfig(BaseModel):
     cycle_minutes: int = Field(default=60, ge=15)
+    serpapi_budget: SerpApiBudgetConfig = Field(default_factory=SerpApiBudgetConfig)
     sources: SourcesConfig = Field(default_factory=SourcesConfig)
     application: ApplicationConfig = Field(default_factory=ApplicationConfig)
 

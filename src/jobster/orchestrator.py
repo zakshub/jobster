@@ -7,6 +7,7 @@ from .executors.registry import get_executor
 from .models import ApplicationPlan, ApplicationState, Job, JobEvaluation, PursuitDecision
 from .settings import SearchConfig
 from .storage import JobsterStore
+from .submission_schedule import is_submission_allowed
 
 
 PURSUIT = {
@@ -24,6 +25,9 @@ def process_applications(
 ) -> dict:
     by_job = {job.id: job for job in jobs}
     answer_bank = load_answer_bank(config.application.answer_bank_path)
+    submission_window_open = is_submission_allowed(
+        config.application.submission_schedule
+    )
     summary = {
         "considered": 0,
         "blocked": 0,
@@ -32,6 +36,7 @@ def process_applications(
         "needs_verification": 0,
         "unsupported": 0,
         "errors": 0,
+        "submission_window_open": submission_window_open,
     }
     submitted_this_cycle = 0
 
@@ -59,10 +64,31 @@ def process_applications(
             questions = executor.inspect_questions(job)
             allow_submit = (
                 config.application.auto_submit
+                and submission_window_open
                 and executor.capability.can_submit
                 and submitted_this_cycle < config.application.max_submissions_per_cycle
             )
-            plan = build_application_plan(job, questions, answer_bank, allow_final_submit=allow_submit)
+            plan = build_application_plan(
+                job,
+                questions,
+                answer_bank,
+                allow_final_submit=allow_submit,
+            )
+
+            if config.application.auto_submit and not submission_window_open:
+                plan.reasons.append(
+                    "Submission paused by schedule: Friday evening through Monday morning"
+                )
+                store.audit(
+                    "application_submission_window_closed",
+                    {
+                        "timezone": config.application.submission_schedule.timezone,
+                        "friday_stop_time": config.application.submission_schedule.friday_stop_time,
+                        "monday_resume_time": config.application.submission_schedule.monday_resume_time,
+                    },
+                    job_id=job.id,
+                )
+
             store.save_application_plan(plan)
 
             if plan.state == ApplicationState.BLOCKED:
@@ -91,7 +117,9 @@ def process_applications(
                 summary["submitted_confirmed"] += 1
             else:
                 plan.state = ApplicationState.BLOCKED
-                plan.reasons.append("Submit action occurred but success confirmation was not detected")
+                plan.reasons.append(
+                    "Submit action occurred but success confirmation was not detected"
+                )
                 summary["needs_verification"] += 1
             store.save_application_plan(plan)
             store.audit("application_execution", receipt, job_id=job.id)
@@ -104,7 +132,11 @@ def process_applications(
                 reasons=[str(exc)],
             )
             store.save_application_plan(plan)
-            store.audit("application_browser_error", {"error": str(exc)}, job_id=job.id)
+            store.audit(
+                "application_browser_error",
+                {"error": str(exc)},
+                job_id=job.id,
+            )
             summary["errors"] += 1
 
     return summary

@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import httpx
 
 from jobster.models import Job
+from jobster.quota import SerpApiQuota
 from .base import JobSource
 from .source_registry import SOURCE_REGISTRY
 
@@ -94,8 +95,9 @@ class SerpApiWebSearchSource(JobSource):
         api_key: str | None = None,
         group_size: int = 6,
         results_per_group: int = 10,
-        cache_hours: float = 6,
+        cache_hours: float = 24,
         timeout: float = 30.0,
+        quota: SerpApiQuota | None = None,
     ):
         self.query = query
         self.sites = sites
@@ -104,6 +106,7 @@ class SerpApiWebSearchSource(JobSource):
         self.results_per_group = max(1, min(results_per_group, 20))
         self.cache_seconds = max(cache_hours, 0) * 3600
         self.timeout = timeout
+        self.quota = quota
         self._cached_at = 0.0
         self._cached_jobs: list[Job] = []
 
@@ -125,6 +128,9 @@ class SerpApiWebSearchSource(JobSource):
         seen: set[str] = set()
 
         for start in range(0, len(self.sites), self.group_size):
+            if self.quota is not None and not self.quota.consume(1):
+                break
+
             group = self.sites[start : start + self.group_size]
             site_filter = " OR ".join(f"site:{site}" for site in group)
             q = f"({self.query}) ({site_filter})"
@@ -147,6 +153,7 @@ class SerpApiWebSearchSource(JobSource):
                     seen.add(key)
                     jobs.append(job)
 
-        self._cached_jobs = jobs
-        self._cached_at = now
+        if jobs:
+            self._cached_jobs = jobs
+            self._cached_at = now
         return list(jobs)

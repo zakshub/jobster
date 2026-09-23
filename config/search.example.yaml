@@ -1,5 +1,15 @@
 cycle_minutes: 60
 
+# Hard guard for a 250-query SerpAPI plan.
+# Jobster keeps 25 queries in reserve and will use at most 7 per day,
+# so it cannot burn the full plan before a 30-day window completes.
+serpapi_budget:
+  monthly_limit: 250
+  reserve_queries: 25
+  daily_limit: 7
+  window_days: 30
+  state_path: data/serpapi_quota.json
+
 sources:
   remoteok:
     enabled: true
@@ -23,7 +33,7 @@ sources:
     worldwide:
     cache_hours: 24
 
-  # Google Jobs through SerpAPI.
+  # Google Jobs through SerpAPI. Disabled by default to preserve quota.
   google_jobs:
     enabled: false
     query: remote senior product designer OR ux architect OR product designer
@@ -37,7 +47,7 @@ sources:
     query: '"Senior Product Designer" OR "UX Architect" OR "Product Designer" OR "UX Engineer" OR "AI Product Designer" remote'
     group_size: 6
     results_per_group: 10
-    cache_hours: 6
+    cache_hours: 24
     sites:
       - linkedin.com/jobs
       - wellfound.com/jobs
@@ -73,3 +83,11 @@ application:
   auto_submit: false
   answer_bank_path: private_data/answer_bank.yaml
   max_submissions_per_cycle: 5
+
+  # Search/evaluation may continue over the weekend, but final automatic
+  # applications are blocked from Friday 18:00 until Monday 09:00 Karachi time.
+  submission_schedule:
+    enabled: true
+    timezone: Asia/Karachi
+    friday_stop_time: "18:00"
+    monday_resume_time: "09:00"
