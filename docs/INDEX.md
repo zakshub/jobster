@@ -12,9 +12,10 @@ Jobster documentation is the authoritative project contract.
 6. product/MVP_SCOPE.md
 7. architecture/SYSTEM_ARCHITECTURE.md
 8. architecture/DOMAIN_MODEL.md
-9. security/PRIVACY_AND_TRUTH.md
-10. design/FIGMA_WORKFLOW.md
-11. operations/DELIVERY_ROADMAP.md
+9. SOURCE_REGISTRY.md
+10. security/PRIVACY_AND_TRUTH.md
+11. design/FIGMA_WORKFLOW.md
+12. operations/DELIVERY_ROADMAP.md
 
 ## Authority order
 

@@ -23,6 +23,14 @@ discovery
 
 Automatic final submission remains OFF by default until the personal answer bank and live ATS flows are validated.
 
+## Discovery coverage
+
+Direct adapters are included for Remote OK, Remotive, We Work Remotely, and Himalayas.
+
+Optional expanded discovery can search LinkedIn Jobs, Wellfound, YC, remote boards, design boards, general boards, and direct ATS-hosted company listings through grouped domain-restricted web search. This requires a private `SERPAPI_API_KEY`.
+
+See `docs/SOURCE_REGISTRY.md` for the complete source universe and operating rules.
+
 ## Source of truth
 
 Read `docs/INDEX.md` first.

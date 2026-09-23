@@ -13,6 +13,10 @@ Validated on GitHub Actions after the final application-orchestration fix.
 - [x] Optional semantic CareerBrain
 - [x] Evidence and unknown preservation
 - [x] Multi source discovery adapters
+- [x] Himalayas public API discovery
+- [x] Expanded source registry including LinkedIn, startup, remote, design, general and ATS-hosted listings
+- [x] Source failure isolation
+- [x] Source-level caching for long-running worker
 - [x] Deduplication
 - [x] ATS detection
 - [x] SQLite workflow state
@@ -78,7 +82,7 @@ Live personal operation still requires owner-controlled runtime inputs:
 2. private_data/answer_bank.yaml with approved answers
 3. valid resume/document paths and portfolio URL
 4. OPENAI_API_KEY for semantic CareerBrain
-5. SERPAPI_API_KEY only if Google Jobs provider is enabled
+5. SERPAPI_API_KEY if Google Jobs or expanded web-source discovery is enabled
 6. supervised validation of each ATS against live forms before unattended auto-submit
 7. VPS deployment
 

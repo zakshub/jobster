@@ -20,13 +20,39 @@ def doctor(
 
     checks.append({"name": "profile", "ok": profile.exists(), "detail": str(profile)})
     checks.append({"name": "search_config", "ok": search.exists(), "detail": str(search)})
-    checks.append({"name": "db_directory", "ok": db.parent.exists() or db.parent == Path("."), "detail": str(db.parent)})
-    checks.append({"name": "playwright_python", "ok": importlib.util.find_spec("playwright") is not None, "detail": "Python package"})
-    checks.append({"name": "openai_semantic_key", "ok": bool(os.getenv("OPENAI_API_KEY")), "detail": "Optional but required for semantic CareerBrain"})
+    checks.append(
+        {
+            "name": "db_directory",
+            "ok": db.parent.exists() or db.parent == Path("."),
+            "detail": str(db.parent),
+        }
+    )
+    checks.append(
+        {
+            "name": "playwright_python",
+            "ok": importlib.util.find_spec("playwright") is not None,
+            "detail": "Python package",
+        }
+    )
+    checks.append(
+        {
+            "name": "openai_semantic_key",
+            "ok": bool(os.getenv("OPENAI_API_KEY")),
+            "detail": "Optional but required for semantic CareerBrain",
+        }
+    )
 
     if search.exists():
         config = load_search_config(search)
-        if config.sources.google_jobs.enabled:
-            checks.append({"name": "serpapi_key", "ok": bool(os.getenv("SERPAPI_API_KEY")), "detail": "Required because Google Jobs source is enabled"})
+        if config.sources.google_jobs.enabled or config.sources.web_search.enabled:
+            checks.append(
+                {
+                    "name": "serpapi_key",
+                    "ok": bool(os.getenv("SERPAPI_API_KEY")),
+                    "detail": (
+                        "Required because Google Jobs or expanded web search is enabled"
+                    ),
+                }
+            )
 
     return checks

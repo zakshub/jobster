@@ -3,14 +3,70 @@ cycle_minutes: 60
 sources:
   remoteok:
     enabled: true
+
   remotive:
     enabled: true
+
   weworkremotely:
     enabled: true
+
+  # Free public API. No key required.
+  himalayas:
+    enabled: true
+    queries:
+      - Senior Product Designer
+      - UX Architect
+      - Product Designer
+      - UX Engineer
+      - AI Product Designer
+    country:
+    worldwide:
+    cache_hours: 24
+
+  # Google Jobs through SerpAPI.
   google_jobs:
     enabled: false
     query: remote senior product designer OR ux architect OR product designer
     location: Pakistan
+
+  # Searches the wider job-source registry, including LinkedIn Jobs, Wellfound,
+  # YC, design boards, general boards and direct ATS-hosted company listings.
+  # Requires SERPAPI_API_KEY.
+  web_search:
+    enabled: false
+    query: '"Senior Product Designer" OR "UX Architect" OR "Product Designer" OR "UX Engineer" OR "AI Product Designer" remote'
+    group_size: 6
+    results_per_group: 10
+    cache_hours: 6
+    sites:
+      - linkedin.com/jobs
+      - wellfound.com/jobs
+      - ycombinator.com/jobs
+      - workingnomads.com
+      - remote.co/remote-jobs
+      - jobspresso.co
+      - justremote.co
+      - dynamitejobs.com
+      - flexjobs.com
+      - dribbble.com/jobs
+      - behance.net/joblist
+      - coroflot.com/design-jobs
+      - uxjobsboard.com
+      - contra.com/opportunities
+      - arc.dev/remote-jobs
+      - builtin.com/jobs/remote
+      - indeed.com
+      - glassdoor.com/Job
+      - ziprecruiter.com/jobs-search
+      - monster.com/jobs
+      - boards.greenhouse.io
+      - jobs.lever.co
+      - jobs.ashbyhq.com
+      - myworkdayjobs.com
+      - jobs.smartrecruiters.com
+      - apply.workable.com
+      - jobs.jobvite.com
+      - bamboohr.com/careers
 
 application:
   semantic_reasoning: true
