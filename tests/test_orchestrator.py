@@ -4,7 +4,7 @@ from jobster.settings import SearchConfig
 from jobster.storage import JobsterStore
 
 
-def test_unknown_executor_is_blocked(tmp_path):
+def test_unknown_executor_is_blocked(tmp_path, monkeypatch):
     store = JobsterStore(tmp_path / "db.sqlite")
     store.init()
     job = Job(id="j", title="Designer", company="Acme", description="x", remote=True, url="https://example.com/opening")
