@@ -17,6 +17,8 @@ Validated on GitHub Actions after the final application-orchestration fix.
 - [x] Expanded source registry including LinkedIn, startup, remote, design, general and ATS-hosted listings
 - [x] Source failure isolation
 - [x] Source-level caching for long-running worker
+- [x] Persistent SerpAPI quota guard: 250 plan, 25-query reserve, max 7/day over 30 days
+- [x] Automatic submission blackout: Friday 18:00 through Monday 09:00 Asia/Karachi
 - [x] Deduplication
 - [x] ATS detection
 - [x] SQLite workflow state
