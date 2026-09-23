@@ -103,3 +103,16 @@ Coded web frontend implementation and hosting remain separate from the approved 
 - [x] Application-packet preparation from UI
 - [x] Default localhost-only binding
 - [x] Auto-submit remains governed by the existing application policy
+
+## Intelligent research console
+
+- [x] Strict career-lane title intake before semantic evaluation
+- [x] Per-source and per-cycle relevance caps
+- [x] Existing irrelevant stored jobs hidden from the default opportunity view
+- [x] Source-diversity visibility
+- [x] Live cycle event stream
+- [x] Draggable, resizable, minimizable and closable terminal window
+- [x] Source URL verification with live/protected/expired/unreachable states
+- [x] Application preparation re-verifies source before creating artifacts
+- [x] Common job-feed text encoding repair
+- [x] Reduced-motion accessibility for UI animations
