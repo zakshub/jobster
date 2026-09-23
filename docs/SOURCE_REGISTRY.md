@@ -93,3 +93,23 @@ Expanded web search requires a private `SERPAPI_API_KEY`.
 Never commit API keys to this public repository.
 
 Domain search can consume paid search-provider quota. Tune `group_size`, `results_per_group`, `cache_hours`, and the `sites` list in the private search configuration.
+
+
+## SerpAPI budget guard
+
+For a 250-query monthly plan, the default safety budget is deliberately more conservative than the provider limit:
+
+- Plan limit: 250 queries
+- Reserved: 25 queries
+- Usable by Jobster: 225 queries
+- Daily hard cap: 7 queries
+- Budget window: 30 days
+- Persistent state: `data/serpapi_quota.json`
+
+This means a restarted worker cannot forget prior usage and suddenly consume the full allowance. Expanded web search is cached for 24 hours by default.
+
+## Application timing guard
+
+Job discovery and evaluation may continue all week.
+
+Automatic final submission is blocked in `Asia/Karachi` from Friday 18:00 until Monday 09:00. The times are configurable in the private search configuration.
