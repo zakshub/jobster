@@ -17,6 +17,10 @@ const state = {
   notifications: [],
   goals: [],
   feedback: [],
+  outreach: [],
+  starStories: [],
+  artifacts: [],
+  watchRules: [],
   selectedJob: null,
   selectedOffer: null,
   compareIds: [],
@@ -94,6 +98,10 @@ const activityLabels = {
   offer_saved: "Offer saved",
   career_goal_saved: "Career goal saved",
   automation_authority_updated: "Authority changed",
+  outreach_saved: "Outreach draft saved",
+  star_story_saved: "Interview story saved",
+  watch_rule_saved: "Watch rule saved",
+  emergency_stop: "Emergency stop used",
 };
 
 const terminalLabels = {
@@ -221,6 +229,43 @@ const modalSchemas = {
       ["horizon", "Time horizon", "select", false, ["now","3_months","1_year","3_years"]],
       ["status", "Status", "select", false, ["active","paused","complete"]],
       ["note", "Why this matters", "textarea", false],
+    ],
+  },
+  outreach: {
+    kicker: "OUTREACH",
+    title: "Add outreach draft",
+    endpoint: "/api/outreach",
+    fields: [
+      ["subject", "Subject", "text", false],
+      ["channel", "Channel", "select", false, ["email","linkedin","other"]],
+      ["status", "Status", "select", false, ["draft","ready","sent","replied","closed"]],
+      ["scheduled_for", "Follow-up time", "datetime-local", false],
+      ["body", "Message", "textarea", true],
+    ],
+  },
+  story: {
+    kicker: "INTERVIEW PREP",
+    title: "Add STAR story",
+    endpoint: "/api/star-stories",
+    fields: [
+      ["title", "Story title", "text", true],
+      ["skills", "Skills (comma separated)", "text", false],
+      ["situation", "Situation", "textarea", false],
+      ["task", "Task", "textarea", false],
+      ["action", "Action", "textarea", false],
+      ["result", "Result", "textarea", false],
+    ],
+  },
+  watch: {
+    kicker: "WATCH RULES",
+    title: "Add opportunity watch rule",
+    endpoint: "/api/watch-rules",
+    fields: [
+      ["label", "Rule name", "text", true],
+      ["title_contains", "Role words", "text", false],
+      ["company", "Company", "text", false],
+      ["minimum_monthly", "Minimum monthly pay", "number", false],
+      ["currency", "Currency", "text", false, null, "USD"],
     ],
   },
 };
@@ -1017,6 +1062,75 @@ async function updateAuthority(action, mode) {
   }
 }
 
+function renderOutreach() {
+  $("outreach-list").innerHTML = state.outreach.length
+    ? state.outreach.map((item) => {
+        const who = item.contact_name || item.contact_company || item.job_company || "Recipient not linked yet";
+        const label = item.subject || (item.body || "").slice(0,70) || "Outreach draft";
+        return `
+          <div class="outreach-row">
+            <span class="outreach-icon">${icon(item.channel === "email" ? "mail" : "message")}</span>
+            <span><strong>${esc(label)}</strong><small>${esc(who)}${item.job_title ? ` · ${esc(item.job_title)}` : ""}</small></span>
+            <span class="queue-state ${esc(item.status || "draft")}">${esc(item.status || "draft")}</span>
+          </div>
+        `;
+      }).join("")
+    : '<div class="empty-state small-empty">No outreach drafts yet. Jobster can prepare context-aware messages, but sending still requires an approved connection.</div>';
+}
+
+function renderStarStories() {
+  $("story-list").innerHTML = state.starStories.length
+    ? state.starStories.map((item) => `
+      <article class="story-card">
+        <h4>${esc(item.title)}</h4>
+        <p>${esc(item.result || item.action || item.situation || "Add the details of what happened and what changed.")}</p>
+        <div class="story-skills">${(item.skills || []).slice(0,6).map((skill) => `<span>${esc(skill)}</span>`).join("")}</div>
+      </article>
+    `).join("")
+    : '<div class="empty-state">No interview stories yet. Save real examples of problems you solved, decisions you made, and results you created.</div>';
+}
+
+function renderArtifacts() {
+  $("artifact-list").innerHTML = state.artifacts.length
+    ? state.artifacts.map((item) => `
+      <div class="artifact-row">
+        <span class="artifact-icon">${icon(item.artifact_type === "resume" ? "briefcase" : "note")}</span>
+        <span><strong>${esc(item.label || item.artifact_type)}</strong><small>${esc([item.title,item.company,friendlyTime(item.created_at)].filter(Boolean).join(" · "))}</small></span>
+        <span class="artifact-path" title="${esc(item.path)}">${esc(item.path)}</span>
+      </div>
+    `).join("")
+    : '<div class="empty-state small-empty">Prepared resumes and decision files will appear here.</div>';
+}
+
+function renderWatchRules() {
+  $("watch-rule-list").innerHTML = state.watchRules.length
+    ? state.watchRules.map((item) => {
+        const criteria = Object.entries(item.criteria || {}).filter(([,value]) => value !== null && value !== undefined && value !== "");
+        return `
+          <div class="watch-rule-row">
+            <span class="watch-rule-icon">${icon("target")}</span>
+            <span><strong>${esc(item.label)}</strong><div class="watch-rule-criteria">${criteria.map(([key,value]) => `<span>${esc(key.replaceAll("_"," "))}: ${esc(value)}</span>`).join("")}</div></span>
+            <span class="queue-state ${item.enabled ? "ready" : ""}">${item.enabled ? "on" : "off"}</span>
+          </div>
+        `;
+      }).join("")
+    : '<div class="empty-state small-empty">No watch rules yet. Add a rule for a role, company or pay threshold you care about.</div>';
+}
+
+async function emergencyStop() {
+  const confirmed = window.confirm("Stop all Jobster automation permissions? This does not delete data.");
+  if (!confirmed) return;
+  try {
+    await api("/api/emergency-stop", {method:"POST"});
+    state.authority = await api("/api/authority");
+    renderAuthority();
+    renderStatus();
+    showToast("Automation stopped. You can turn individual permissions back on when ready.");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
 function renderNotifications() {
   const unread = state.notifications.filter((item) => !item.is_read);
   $("notification-dot").classList.toggle("is-visible", unread.length > 0);
@@ -1066,6 +1180,10 @@ function renderAll() {
   renderGoals();
   renderEvidence();
   renderSettings();
+  renderOutreach();
+  renderStarStories();
+  renderArtifacts();
+  renderWatchRules();
   renderNotifications();
   renderCompareTray();
 }
@@ -1075,7 +1193,7 @@ async function loadAll({ quiet = false } = {}) {
     const [
       status, jobs, applications, activity, attention, readiness, settings,
       missions, insights, evidence, companies, contacts, interviews, offers,
-      authority, notifications, goals, feedback,
+      authority, notifications, goals, feedback, outreach, starStories, artifacts, watchRules,
     ] = await Promise.all([
       api("/api/status"),
       api("/api/jobs?limit=300"),
@@ -1095,11 +1213,15 @@ async function loadAll({ quiet = false } = {}) {
       api("/api/notifications?limit=100"),
       api("/api/goals?limit=100"),
       api("/api/feedback?limit=150"),
+      api("/api/outreach?limit=200"),
+      api("/api/star-stories?limit=200"),
+      api("/api/artifacts?limit=300"),
+      api("/api/watch-rules?limit=100"),
     ]);
     Object.assign(state, {
       status, jobs, applications, activity, attention, readiness, settings,
       missions, insights, evidence, companies, contacts, interviews, offers,
-      authority, notifications, goals, feedback,
+      authority, notifications, goals, feedback, outreach, starStories, artifacts, watchRules,
     });
     renderAll();
   } catch (error) {
@@ -1363,6 +1485,16 @@ async function submitEntityForm(event) {
   if (!schema) return;
   const formData = new FormData(event.currentTarget);
   const payload = Object.fromEntries(formData.entries());
+
+  if (type === "watch") {
+    const criteria = {};
+    for (const key of ["title_contains","company","minimum_monthly","currency"]) {
+      if (payload[key]) criteria[key] = payload[key];
+      delete payload[key];
+    }
+    payload.criteria = criteria;
+  }
+
   try {
     await api(schema.endpoint, { method: "POST", body: JSON.stringify(payload) });
     closeEntityModal();
@@ -1691,6 +1823,10 @@ $("add-contact-btn").addEventListener("click",() => openEntityModal("contact"));
 $("add-interview-btn").addEventListener("click",() => openEntityModal("interview"));
 $("add-offer-btn").addEventListener("click",() => openEntityModal("offer"));
 $("add-goal-btn").addEventListener("click",() => openEntityModal("goal"));
+$("add-outreach-btn").addEventListener("click",() => openEntityModal("outreach"));
+$("add-story-btn").addEventListener("click",() => openEntityModal("story"));
+$("add-watch-rule-btn").addEventListener("click",() => openEntityModal("watch"));
+$("emergency-stop-btn").addEventListener("click",emergencyStop);
 $("analyze-message-btn").addEventListener("click",analyzeRecruiterMessage);
 $("export-data-btn").addEventListener("click",() => { window.location.href="/api/export"; });
 
