@@ -6,6 +6,7 @@ import httpx
 
 from jobster.models import Job
 from jobster.quota import SerpApiQuota
+from jobster.text_utils import repair_text
 from .base import JobSource
 
 
@@ -17,7 +18,7 @@ def parse_google_jobs(payload: dict) -> list[Job]:
     for item in payload.get("jobs_results", []):
         job_id = item.get("job_id") or item.get("share_link") or f"{item.get('company_name')}:{item.get('title')}"
         detected_extensions = item.get("detected_extensions") or {}
-        location = str(item.get("location") or "")
+        location = repair_text(item.get("location") or "")
         remote = bool(detected_extensions.get("work_from_home")) or "remote" in location.lower()
 
         apply_options = item.get("apply_options") or []
@@ -29,8 +30,8 @@ def parse_google_jobs(payload: dict) -> list[Job]:
         jobs.append(
             Job(
                 id=f"google_jobs:{job_id}",
-                title=str(item.get("title") or ""),
-                company=str(item.get("company_name") or "Unknown company"),
+                title=repair_text(item.get("title") or ""),
+                company=repair_text(item.get("company_name") or "Unknown company"),
                 description=str(item.get("description") or ""),
                 location=location or None,
                 remote=remote if location or detected_extensions else None,
