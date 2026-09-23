@@ -578,6 +578,10 @@ def create_app() -> FastAPI:
             "interviews": store.list_interviews(limit=500),
             "offers": store.list_offers(limit=500),
             "goals": store.list_goals(limit=500),
+            "outreach": store.list_outreach(limit=500),
+            "star_stories": store.list_star_stories(limit=500),
+            "artifacts": store.list_application_artifacts(limit=500),
+            "watch_rules": store.list_watch_rules(limit=500),
             "authority": store.get_authority(),
             "activity": store.list_activity(limit=1000),
         }
@@ -587,6 +591,96 @@ def create_app() -> FastAPI:
                 "Content-Disposition": "attachment; filename=jobster-career-export.json"
             },
         )
+
+    @app.get("/api/outreach")
+    def outreach(limit: int = 200):
+        _, _, store = _runtime()
+        return store.list_outreach(limit=min(max(limit, 1), 500))
+
+    @app.post("/api/outreach")
+    def save_outreach(payload: dict):
+        _, _, store = _runtime()
+        body = str(payload.get("body") or "").strip()
+        if not body:
+            raise HTTPException(status_code=400, detail="Message body is required")
+        item = {
+            "id": str(payload.get("id") or uuid.uuid4()),
+            "contact_id": str(payload.get("contact_id") or "").strip() or None,
+            "job_id": str(payload.get("job_id") or "").strip() or None,
+            "channel": str(payload.get("channel") or "email").strip() or "email",
+            "subject": str(payload.get("subject") or "").strip() or None,
+            "body": body,
+            "status": str(payload.get("status") or "draft").strip() or "draft",
+            "scheduled_for": str(payload.get("scheduled_for") or "").strip() or None,
+        }
+        result = store.upsert_outreach(item)
+        store.audit("outreach_saved", {"id": result["id"], "status": result["status"]}, job_id=result.get("job_id"))
+        return result
+
+    @app.get("/api/star-stories")
+    def star_stories(limit: int = 200):
+        _, _, store = _runtime()
+        return store.list_star_stories(limit=min(max(limit, 1), 500))
+
+    @app.post("/api/star-stories")
+    def save_star_story(payload: dict):
+        _, _, store = _runtime()
+        title = str(payload.get("title") or "").strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="Story title is required")
+        skills = payload.get("skills") or []
+        if isinstance(skills, str):
+            skills = [item.strip() for item in skills.split(",") if item.strip()]
+        item = {
+            "id": str(payload.get("id") or uuid.uuid4()),
+            "title": title,
+            "situation": str(payload.get("situation") or "").strip() or None,
+            "task": str(payload.get("task") or "").strip() or None,
+            "action": str(payload.get("action") or "").strip() or None,
+            "result": str(payload.get("result") or "").strip() or None,
+            "skills": skills,
+            "status": str(payload.get("status") or "active").strip() or "active",
+        }
+        result = store.upsert_star_story(item)
+        store.audit("star_story_saved", {"id": result["id"], "title": title})
+        return result
+
+    @app.get("/api/artifacts")
+    def artifacts(job_id: str | None = None, limit: int = 300):
+        _, _, store = _runtime()
+        return store.list_application_artifacts(
+            job_id=job_id,
+            limit=min(max(limit, 1), 500),
+        )
+
+    @app.get("/api/watch-rules")
+    def watch_rules(limit: int = 100):
+        _, _, store = _runtime()
+        return store.list_watch_rules(limit=min(max(limit, 1), 300))
+
+    @app.post("/api/watch-rules")
+    def save_watch_rule(payload: dict):
+        _, _, store = _runtime()
+        label = str(payload.get("label") or "").strip()
+        if not label:
+            raise HTTPException(status_code=400, detail="Rule label is required")
+        criteria = payload.get("criteria") or {}
+        if not isinstance(criteria, dict):
+            raise HTTPException(status_code=400, detail="criteria must be an object")
+        item = {
+            "id": str(payload.get("id") or uuid.uuid4()),
+            "label": label,
+            "criteria": criteria,
+            "enabled": bool(payload.get("enabled", True)),
+        }
+        result = store.upsert_watch_rule(item)
+        store.audit("watch_rule_saved", {"id": result["id"], "label": label})
+        return result
+
+    @app.post("/api/emergency-stop")
+    def emergency_stop():
+        _, _, store = _runtime()
+        return store.emergency_stop()
 
     @app.get("/api/jobs")
     def jobs(limit: int = 100, offset: int = 0, include_irrelevant: bool = False):
@@ -839,6 +933,20 @@ def create_app() -> FastAPI:
         evaluation = JobEvaluation.model_validate(bundle["evaluation"])
         output = Path("artifacts")
         result = build_application_packet(profile, job, evaluation, output)
+        if result.get("resume_markdown"):
+            store.save_application_artifact(
+                job_id,
+                "resume",
+                result["resume_markdown"],
+                "Tailored resume",
+            )
+        if result.get("decision_summary"):
+            store.save_application_artifact(
+                job_id,
+                "decision_summary",
+                result["decision_summary"],
+                "CareerBrain decision summary",
+            )
         store.audit("application_packet_prepared_from_ui", result, job_id=job_id)
         return {**result, "verification": verification_payload}
 
