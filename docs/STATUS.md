@@ -1,5 +1,11 @@
 # Jobster Status
 
+## Status
+
+**PERSONAL MVP COMPLETE — v0.1.0**
+
+Validated on GitHub Actions after the final application-orchestration fix.
+
 ## Personal MVP capability checklist
 
 - [x] Documentation source of truth
@@ -26,6 +32,7 @@
 - [x] Docker and Compose
 - [x] Runtime doctor command
 - [x] CI configuration
+- [x] CI passing on the final code state
 
 ## Default safety state
 
@@ -33,9 +40,11 @@ Automatic final submission is OFF by default.
 
 Turning it on does not bypass truth or sensitive-question gates.
 
-## Remaining owner deployment inputs
+## Owner deployment inputs
 
-The software MVP is complete when code and CI pass. Live personal operation additionally requires owner-controlled data and credentials:
+The software MVP is complete.
+
+Live personal operation still requires owner-controlled runtime inputs:
 
 1. private_data/profile.yaml with verified personal facts
 2. private_data/answer_bank.yaml with approved answers
@@ -45,4 +54,4 @@ The software MVP is complete when code and CI pass. Live personal operation addi
 6. supervised validation of each ATS against live forms before unattended auto-submit
 7. VPS deployment
 
-These are deployment inputs rather than missing core workflow code.
+These are deployment inputs, not missing product workflow code.
