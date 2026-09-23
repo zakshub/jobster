@@ -7,3 +7,5 @@ private_data/
 data/
 artifacts/
 playwright/.auth/
+
+*.egg-info/

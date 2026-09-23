@@ -23,6 +23,37 @@ discovery
 
 Automatic final submission remains OFF by default until the personal answer bank and live ATS flows are validated.
 
+## Web command center
+
+Jobster now includes a local browser UI connected directly to the existing Python runtime and SQLite state.
+
+The visual language is derived from the canonical Figma Jobster cover: dark `#12141a` brand surface, `#3955f6` primary action, Inter typography, restrained borders, evidence-first hierarchy and the original product copy.
+
+Run it locally:
+
+```powershell
+$env:JOBSTER_PROFILE="private_data/profile.yaml"
+$env:JOBSTER_SEARCH="config/search.yaml"
+$env:JOBSTER_DB="data/jobster.db"
+jobster ui
+```
+
+Then open `http://127.0.0.1:8765`.
+
+The UI provides:
+
+- overview metrics and operating status
+- live opportunity list with CareerBrain output
+- job detail drawer with matches, gaps and next action
+- application-plan states and blockers
+- audit activity
+- SerpAPI budget visibility
+- submission-window visibility
+- supervised "Run search cycle" control
+- application-packet preparation for evaluated jobs
+
+The UI does not expose private keys, internal prompts or hidden reasoning.
+
 ## Discovery coverage
 
 Direct adapters are included for Remote OK, Remotive, We Work Remotely, and Himalayas.

@@ -89,3 +89,17 @@ Live personal operation still requires owner-controlled runtime inputs:
 7. VPS deployment
 
 Coded web frontend implementation and hosting remain separate from the approved Figma design.
+
+## Web command center
+
+- [x] Figma-derived visual system implemented
+- [x] Local FastAPI web runtime
+- [x] Live SQLite dashboard metrics
+- [x] Opportunity list and detail view
+- [x] Application-plan visibility
+- [x] Audit trail
+- [x] Search quota and submission-window status
+- [x] Manual run-cycle control
+- [x] Application-packet preparation from UI
+- [x] Default localhost-only binding
+- [x] Auto-submit remains governed by the existing application policy
