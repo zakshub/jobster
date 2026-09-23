@@ -72,7 +72,7 @@ _ROLE_PATTERNS: tuple[tuple[re.Pattern[str], int, str], ...] = (
     (re.compile(r"\bui engineer\b"), 76, "ui engineering"),
 )
 
-_DESIGN_CONTEXT = ("product", "ux", "user experience", "ui", "interaction", "design system", "ai")
+_DESIGN_CONTEXT = ("product design", "ux", "user experience", "ui", "interaction", "design system")
 _ROLE_NOUNS = ("designer", "architect", "engineer", "design lead", "design manager", "head of design")
 
 
