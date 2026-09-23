@@ -6,7 +6,7 @@ It is built first for Zak as an evidence grounded CareerBrain plus automation sy
 
 ## Current status
 
-**Personal MVP v0.1.0 is complete.**
+**Personal runtime plus enterprise command center is implemented.**
 
 The repository contains the full personal MVP workflow:
 
@@ -42,18 +42,26 @@ Then open `http://127.0.0.1:8765`.
 
 The UI now uses a strict career-lane intake gate before semantic evaluation, so broad job-board feeds do not flood the database with unrelated engineering, sales, HR, support or course/content roles. It also includes a draggable/resizable live research terminal and on-demand source verification.
 
-The UI provides:
+The enterprise command center provides:
 
-- overview metrics, noise-blocked count, source diversity and operating status
-- live opportunity list with CareerBrain output and strict role relevance
-- job detail drawer with matches, gaps and next action
-- application-plan states and blockers
-- audit activity
-- SerpAPI budget visibility
-- submission-window visibility
-- one-click targeted research with a draggable/resizable live terminal
+- Today view focused on useful actions rather than dashboard decoration
+- strict opportunity filtering and source diversity
+- saved jobs, hidden jobs and private job notes
+- opportunity sorting, source filters and live-check status
+- application pipeline
+- first-class "Needs you" queue for questions and blockers
+- Career Brain readiness and application-site capability view
+- activity history
+- plain-English settings summary
+- Ctrl/Cmd + K command menu
+- original Jobster SVG icon language
+- original Career Orbit system artwork
+- subtle micro-interactions with reduced-motion support
+- one-click job search with a draggable/resizable live activity window
 - source verification before application preparation
 - application-packet preparation for evaluated jobs
+
+See `docs/design/ENTERPRISE_COMMAND_CENTER.md` for the current design and interaction contract.
 
 The UI does not expose private keys, internal prompts or hidden reasoning.
 

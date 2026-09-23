@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .answer_bank import load_answer_bank
 from .application_packet import build_application_packet
 from .models import Job, JobEvaluation
 from .profile import load_profile
@@ -254,6 +255,8 @@ def create_app() -> FastAPI:
         profile, config, store = _runtime()
         metrics = store.dashboard_metrics()
         relevant_jobs, hidden = _relevant_jobs(profile, config, store)
+        attention = store.list_needs_attention(limit=200)
+        pipeline = store.pipeline_counts()
         source_counts = dict(Counter(job["source"] for job in relevant_jobs))
         metrics["jobs"] = len(relevant_jobs)
         metrics["hidden_irrelevant"] = hidden
@@ -263,6 +266,7 @@ def create_app() -> FastAPI:
             if job.get("decision") in {"high_priority", "aggressive_pursuit"}
         )
         metrics["evaluated"] = sum(1 for job in relevant_jobs if job.get("decision"))
+        metrics["needs_you"] = len(attention)
 
         return {
             "profile": {
@@ -272,8 +276,11 @@ def create_app() -> FastAPI:
                 "target_titles": profile.target_titles,
                 "target_monthly": profile.compensation.target_monthly,
                 "currency": profile.compensation.currency,
+                "minimum_monthly": profile.compensation.minimum_monthly,
+                "remote_only": profile.remote_only,
             },
             "metrics": metrics,
+            "pipeline": pipeline,
             "source_counts": source_counts,
             "intake": {
                 "enabled": config.intake.enabled,
@@ -306,12 +313,170 @@ def create_app() -> FastAPI:
         start = max(offset, 0)
         return visible[start : start + min(max(limit, 1), 500)]
 
+    @app.get("/api/attention")
+    def attention(limit: int = 100):
+        _, _, store = _runtime()
+        return store.list_needs_attention(limit=min(max(limit, 1), 500))
+
+    @app.get("/api/pipeline")
+    def pipeline():
+        _, _, store = _runtime()
+        return store.pipeline_counts()
+
+    @app.get("/api/readiness")
+    def readiness():
+        profile, config, store = _runtime()
+        answers = load_answer_bank(config.application.answer_bank_path)
+        verified = [answer for answer in answers if answer.verified]
+        automatic = [
+            answer
+            for answer in verified
+            if answer.allow_automatic_use
+        ]
+        source_count = sum(
+            1
+            for enabled in (
+                config.sources.remoteok.enabled,
+                config.sources.remotive.enabled,
+                config.sources.weworkremotely.enabled,
+                config.sources.himalayas.enabled,
+                config.sources.google_jobs.enabled,
+                config.sources.web_search.enabled,
+            )
+            if enabled
+        )
+        checks = [
+            {
+                "key": "profile",
+                "label": "Career profile",
+                "ready": bool(profile.display_name and profile.target_titles),
+                "detail": "Your name and target roles are available."
+                if profile.display_name and profile.target_titles
+                else "Add your name and at least one target role.",
+            },
+            {
+                "key": "answers",
+                "label": "Application answers",
+                "ready": bool(verified),
+                "detail": f"{len(automatic)} approved answers can be used automatically."
+                if verified
+                else "No approved application answers are available yet.",
+            },
+            {
+                "key": "sources",
+                "label": "Job sources",
+                "ready": source_count > 0,
+                "detail": f"{source_count} job sources are turned on.",
+            },
+            {
+                "key": "advanced_review",
+                "label": "Advanced job review",
+                "ready": bool(os.getenv("OPENAI_API_KEY")),
+                "detail": "Advanced job review is available."
+                if os.getenv("OPENAI_API_KEY")
+                else "Jobster will use its built-in basic review until this is available.",
+            },
+            {
+                "key": "expanded_search",
+                "label": "Expanded web search",
+                "ready": bool(os.getenv("SERPAPI_API_KEY"))
+                or not (config.sources.google_jobs.enabled or config.sources.web_search.enabled),
+                "detail": "Expanded web search is ready."
+                if os.getenv("SERPAPI_API_KEY")
+                else "Direct job sources still work without expanded web search.",
+            },
+        ]
+        ready_count = sum(1 for check in checks if check["ready"])
+        return {
+            "checks": checks,
+            "ready_count": ready_count,
+            "total": len(checks),
+            "answer_bank": {
+                "total": len(answers),
+                "verified": len(verified),
+                "automatic": len(automatic),
+            },
+            "application_sites": [
+                {"name": "Greenhouse", "level": "fill_and_submit"},
+                {"name": "Lever", "level": "fill_and_submit"},
+                {"name": "Ashby", "level": "fill_and_submit"},
+                {"name": "Workday", "level": "check_only"},
+            ],
+            "auto_apply": config.application.auto_submit,
+            "submission_window_open": is_submission_allowed(
+                config.application.submission_schedule
+            ),
+            "pipeline": store.pipeline_counts(),
+        }
+
+    @app.get("/api/settings")
+    def user_settings():
+        profile, config, _ = _runtime()
+        return {
+            "job_search": {
+                "cycle_minutes": config.cycle_minutes,
+                "target_titles": profile.target_titles,
+                "remote_only": profile.remote_only,
+                "minimum_monthly": profile.compensation.minimum_monthly,
+                "target_monthly": profile.compensation.target_monthly,
+                "currency": profile.compensation.currency,
+            },
+            "relevance_filter": {
+                "enabled": config.intake.enabled,
+                "minimum_match": config.intake.min_title_score,
+                "max_per_source": config.intake.max_per_source,
+                "max_per_search": config.intake.max_total,
+            },
+            "applications": {
+                "auto_apply": config.application.auto_submit,
+                "max_per_search": config.application.max_submissions_per_cycle,
+                "timezone": config.application.submission_schedule.timezone,
+                "friday_stop": config.application.submission_schedule.friday_stop_time,
+                "monday_resume": config.application.submission_schedule.monday_resume_time,
+            },
+        }
+
     @app.get("/api/jobs/{job_id}")
     def job_detail(job_id: str):
         _, _, store = _runtime()
         result = store.get_job_bundle(job_id)
         if result is None:
             raise HTTPException(status_code=404, detail="Job not found")
+        return result
+
+    @app.post("/api/jobs/{job_id}/preference")
+    def update_job_preference(job_id: str, payload: dict):
+        _, _, store = _runtime()
+        if store.get_job_bundle(job_id) is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        allowed = {"saved", "dismissed", "note"}
+        unexpected = set(payload) - allowed
+        if unexpected:
+            raise HTTPException(
+                status_code=400,
+                detail="Only saved, dismissed, and note can be changed.",
+            )
+
+        saved = payload.get("saved")
+        dismissed = payload.get("dismissed")
+        note = payload.get("note")
+        if saved is not None and not isinstance(saved, bool):
+            raise HTTPException(status_code=400, detail="saved must be true or false")
+        if dismissed is not None and not isinstance(dismissed, bool):
+            raise HTTPException(status_code=400, detail="dismissed must be true or false")
+        if note is not None and not isinstance(note, str):
+            raise HTTPException(status_code=400, detail="note must be text")
+        if isinstance(note, str):
+            note = note.strip()[:2000] or ""
+
+        result = store.save_job_preference(
+            job_id,
+            saved=saved,
+            dismissed=dismissed,
+            note=note,
+        )
+        store.audit("job_preference_updated", result, job_id=job_id)
         return result
 
     @app.post("/api/jobs/{job_id}/verify")
