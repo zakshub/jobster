@@ -67,6 +67,85 @@ CREATE TABLE IF NOT EXISTS job_preferences (
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
+CREATE TABLE IF NOT EXISTS company_watchlist (
+    company TEXT PRIMARY KEY,
+    watching INTEGER NOT NULL DEFAULT 1,
+    note TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS career_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT,
+    reaction TEXT NOT NULL,
+    note TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+CREATE TABLE IF NOT EXISTS contacts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    company TEXT,
+    role TEXT,
+    email TEXT,
+    linkedin_url TEXT,
+    relationship TEXT NOT NULL DEFAULT 'new',
+    note TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS interviews (
+    id TEXT PRIMARY KEY,
+    job_id TEXT,
+    company TEXT NOT NULL,
+    title TEXT NOT NULL,
+    scheduled_at TEXT,
+    format TEXT,
+    status TEXT NOT NULL DEFAULT 'planned',
+    note TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+CREATE TABLE IF NOT EXISTS offers (
+    id TEXT PRIMARY KEY,
+    job_id TEXT,
+    company TEXT NOT NULL,
+    title TEXT NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    monthly_base REAL,
+    bonus TEXT,
+    equity TEXT,
+    status TEXT NOT NULL DEFAULT 'reviewing',
+    note TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+CREATE TABLE IF NOT EXISTS automation_authority (
+    action TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    requires_approval INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    job_id TEXT,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS career_goals (
+    id TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    horizon TEXT NOT NULL DEFAULT 'now',
+    status TEXT NOT NULL DEFAULT 'active',
+    note TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -552,3 +631,321 @@ class JobsterStore:
                 }
             )
         return output
+
+
+    def set_company_watch(self, company: str, watching: bool, note: str | None = None) -> dict:
+        company = repair_text(company).strip()
+        if not company:
+            raise ValueError("Company is required")
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO company_watchlist(company, watching, note)
+                VALUES (?, ?, ?)
+                ON CONFLICT(company) DO UPDATE SET
+                  watching=excluded.watching,
+                  note=COALESCE(excluded.note, company_watchlist.note),
+                  updated_at=CURRENT_TIMESTAMP""",
+                (company, 1 if watching else 0, note),
+            )
+        return {"company": company, "watching": watching, "note": note}
+
+    def list_company_summaries(self, limit: int = 200) -> list[dict]:
+        with self.connect() as con:
+            rows = con.execute(
+                """
+                SELECT
+                    j.company,
+                    COUNT(*) AS jobs,
+                    MAX(COALESCE(CAST(json_extract(e.payload_json, '$.interest_score') AS INTEGER), 0)) AS best_score,
+                    MAX(j.updated_at) AS last_seen,
+                    SUM(CASE WHEN e.decision IN ('aggressive_pursuit','high_priority','apply') THEN 1 ELSE 0 END) AS strong_jobs,
+                    MAX(COALESCE(w.watching, 0)) AS watching,
+                    MAX(w.note) AS note
+                FROM jobs j
+                LEFT JOIN evaluations e ON e.job_id = j.id
+                LEFT JOIN company_watchlist w ON lower(w.company) = lower(j.company)
+                GROUP BY j.company
+                ORDER BY watching DESC, strong_jobs DESC, best_score DESC, last_seen DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            {
+                "company": repair_text(row["company"]),
+                "jobs": row["jobs"],
+                "best_score": row["best_score"] or 0,
+                "strong_jobs": row["strong_jobs"] or 0,
+                "last_seen": row["last_seen"],
+                "watching": bool(row["watching"]),
+                "note": row["note"],
+            }
+            for row in rows
+        ]
+
+    def save_feedback(self, job_id: str | None, reaction: str, note: str | None = None) -> dict:
+        with self.connect() as con:
+            cur = con.execute(
+                "INSERT INTO career_feedback(job_id, reaction, note) VALUES (?, ?, ?)",
+                (job_id, reaction, note),
+            )
+            feedback_id = cur.lastrowid
+        payload = {"id": feedback_id, "job_id": job_id, "reaction": reaction, "note": note}
+        self.audit("career_feedback_added", payload, job_id=job_id)
+        return payload
+
+    def list_feedback(self, limit: int = 200) -> list[dict]:
+        with self.connect() as con:
+            rows = con.execute(
+                """
+                SELECT f.id, f.job_id, f.reaction, f.note, f.created_at,
+                       j.title, j.company
+                FROM career_feedback f
+                LEFT JOIN jobs j ON j.id = f.job_id
+                ORDER BY f.id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def upsert_contact(self, payload: dict) -> dict:
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO contacts(id, name, company, role, email, linkedin_url, relationship, note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  name=excluded.name,
+                  company=excluded.company,
+                  role=excluded.role,
+                  email=excluded.email,
+                  linkedin_url=excluded.linkedin_url,
+                  relationship=excluded.relationship,
+                  note=excluded.note,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (
+                    payload["id"],
+                    payload["name"],
+                    payload.get("company"),
+                    payload.get("role"),
+                    payload.get("email"),
+                    payload.get("linkedin_url"),
+                    payload.get("relationship", "new"),
+                    payload.get("note"),
+                ),
+            )
+        return payload
+
+    def list_contacts(self, limit: int = 300) -> list[dict]:
+        with self.connect() as con:
+            rows = con.execute(
+                """SELECT id, name, company, role, email, linkedin_url, relationship, note,
+                          created_at, updated_at
+                   FROM contacts
+                   ORDER BY updated_at DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def upsert_interview(self, payload: dict) -> dict:
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO interviews(id, job_id, company, title, scheduled_at, format, status, note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  job_id=excluded.job_id,
+                  company=excluded.company,
+                  title=excluded.title,
+                  scheduled_at=excluded.scheduled_at,
+                  format=excluded.format,
+                  status=excluded.status,
+                  note=excluded.note,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (
+                    payload["id"],
+                    payload.get("job_id"),
+                    payload["company"],
+                    payload["title"],
+                    payload.get("scheduled_at"),
+                    payload.get("format"),
+                    payload.get("status", "planned"),
+                    payload.get("note"),
+                ),
+            )
+        return payload
+
+    def list_interviews(self, limit: int = 200) -> list[dict]:
+        with self.connect() as con:
+            rows = con.execute(
+                """SELECT id, job_id, company, title, scheduled_at, format, status, note,
+                          created_at, updated_at
+                   FROM interviews
+                   ORDER BY
+                     CASE WHEN scheduled_at IS NULL THEN 1 ELSE 0 END,
+                     scheduled_at ASC,
+                     updated_at DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def upsert_offer(self, payload: dict) -> dict:
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO offers(id, job_id, company, title, currency, monthly_base, bonus, equity, status, note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  job_id=excluded.job_id,
+                  company=excluded.company,
+                  title=excluded.title,
+                  currency=excluded.currency,
+                  monthly_base=excluded.monthly_base,
+                  bonus=excluded.bonus,
+                  equity=excluded.equity,
+                  status=excluded.status,
+                  note=excluded.note,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (
+                    payload["id"],
+                    payload.get("job_id"),
+                    payload["company"],
+                    payload["title"],
+                    payload.get("currency", "USD"),
+                    payload.get("monthly_base"),
+                    payload.get("bonus"),
+                    payload.get("equity"),
+                    payload.get("status", "reviewing"),
+                    payload.get("note"),
+                ),
+            )
+        return payload
+
+    def list_offers(self, limit: int = 100) -> list[dict]:
+        with self.connect() as con:
+            rows = con.execute(
+                """SELECT id, job_id, company, title, currency, monthly_base, bonus, equity, status, note,
+                          created_at, updated_at
+                   FROM offers
+                   ORDER BY updated_at DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_authority(self) -> dict[str, dict]:
+        defaults = {
+            "search": {"enabled": True, "requires_approval": False},
+            "prepare": {"enabled": True, "requires_approval": False},
+            "submit": {"enabled": False, "requires_approval": True},
+            "contact": {"enabled": False, "requires_approval": True},
+            "follow_up": {"enabled": False, "requires_approval": True},
+        }
+        with self.connect() as con:
+            rows = con.execute(
+                "SELECT action, enabled, requires_approval, updated_at FROM automation_authority"
+            ).fetchall()
+        for row in rows:
+            defaults[row["action"]] = {
+                "enabled": bool(row["enabled"]),
+                "requires_approval": bool(row["requires_approval"]),
+                "updated_at": row["updated_at"],
+            }
+        return defaults
+
+    def set_authority(self, action: str, enabled: bool, requires_approval: bool) -> dict:
+        allowed = {"search", "prepare", "submit", "contact", "follow_up"}
+        if action not in allowed:
+            raise ValueError("Unknown authority action")
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO automation_authority(action, enabled, requires_approval)
+                VALUES (?, ?, ?)
+                ON CONFLICT(action) DO UPDATE SET
+                  enabled=excluded.enabled,
+                  requires_approval=excluded.requires_approval,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (action, 1 if enabled else 0, 1 if requires_approval else 0),
+            )
+        result = {
+            "action": action,
+            "enabled": enabled,
+            "requires_approval": requires_approval,
+        }
+        self.audit("automation_authority_updated", result)
+        return result
+
+    def add_notification(self, kind: str, title: str, body: str, job_id: str | None = None) -> dict:
+        with self.connect() as con:
+            cur = con.execute(
+                "INSERT INTO notifications(kind, title, body, job_id) VALUES (?, ?, ?, ?)",
+                (kind, title, body, job_id),
+            )
+            notification_id = cur.lastrowid
+        return {
+            "id": notification_id,
+            "kind": kind,
+            "title": title,
+            "body": body,
+            "job_id": job_id,
+            "is_read": False,
+        }
+
+    def list_notifications(self, limit: int = 100, unread_only: bool = False) -> list[dict]:
+        query = """SELECT id, kind, title, body, job_id, is_read, created_at
+                   FROM notifications"""
+        params: tuple = ()
+        if unread_only:
+            query += " WHERE is_read = 0"
+        query += " ORDER BY id DESC LIMIT ?"
+        params = (limit,)
+        with self.connect() as con:
+            rows = con.execute(query, params).fetchall()
+        return [
+            {
+                **dict(row),
+                "is_read": bool(row["is_read"]),
+            }
+            for row in rows
+        ]
+
+    def mark_notification_read(self, notification_id: int, is_read: bool = True) -> None:
+        with self.connect() as con:
+            con.execute(
+                "UPDATE notifications SET is_read = ? WHERE id = ?",
+                (1 if is_read else 0, notification_id),
+            )
+
+    def upsert_goal(self, payload: dict) -> dict:
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO career_goals(id, label, horizon, status, note)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  label=excluded.label,
+                  horizon=excluded.horizon,
+                  status=excluded.status,
+                  note=excluded.note,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (
+                    payload["id"],
+                    payload["label"],
+                    payload.get("horizon", "now"),
+                    payload.get("status", "active"),
+                    payload.get("note"),
+                ),
+            )
+        return payload
+
+    def list_goals(self, limit: int = 100) -> list[dict]:
+        with self.connect() as con:
+            rows = con.execute(
+                """SELECT id, label, horizon, status, note, created_at, updated_at
+                   FROM career_goals
+                   ORDER BY
+                     CASE status WHEN 'active' THEN 0 ELSE 1 END,
+                     updated_at DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
