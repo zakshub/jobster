@@ -355,9 +355,58 @@ def build_daily_missions(profile: CareerProfile, store: JobsterStore) -> list[di
     return missions[:5]
 
 
-def build_insights(profile: CareerProfile, store: JobsterStore) -> dict:
+
+
+def diagnose_bottleneck(funnel: dict) -> dict:
+    reviewed = int(funnel.get("reviewed", 0))
+    strong = int(funnel.get("worth_pursuing", 0))
+    applications = int(funnel.get("applications", 0))
+    submitted = int(funnel.get("submitted", 0))
+    interviews = int(funnel.get("interviews", 0))
+    offers = int(funnel.get("offers", 0))
+
+    if reviewed >= 10 and strong == 0:
+        return {
+            "stage": "search_quality",
+            "title": "The search is finding jobs, but not enough are worth pursuing.",
+            "detail": "Tighten sources and role targeting before increasing application volume.",
+        }
+    if strong >= 3 and applications == 0:
+        return {
+            "stage": "execution",
+            "title": "Strong opportunities exist, but they are not becoming applications.",
+            "detail": "Review blockers, application readiness, and the Needs-you queue.",
+        }
+    if submitted >= 5 and interviews == 0:
+        return {
+            "stage": "response",
+            "title": "Applications are going out, but recruiter response is the weak point.",
+            "detail": "Review positioning, evidence, source quality, and whether outreach would add value.",
+        }
+    if interviews >= 3 and offers == 0:
+        return {
+            "stage": "interview",
+            "title": "The process is reaching interviews, but not yet converting to offers.",
+            "detail": "Use the STAR story bank and interview debriefs to improve preparation.",
+        }
+    if offers > 0:
+        return {
+            "stage": "offer",
+            "title": "The search has reached offer stage.",
+            "detail": "Focus on the quality of the move, trade-offs, and negotiation — not application volume.",
+        }
     return {
-        "funnel": build_funnel(store),
+        "stage": "building",
+        "title": "The funnel is still building.",
+        "detail": "Keep collecting enough high-quality evidence before drawing strong conclusions.",
+    }
+
+
+def build_insights(profile: CareerProfile, store: JobsterStore) -> dict:
+    funnel = build_funnel(store)
+    return {
+        "funnel": funnel,
+        "bottleneck": diagnose_bottleneck(funnel),
         "sources": build_source_performance(store),
         "roles": build_role_trends(store),
         "salary": build_salary_intelligence(profile, store),
