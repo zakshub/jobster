@@ -88,12 +88,36 @@ class CompensationPolicy(BaseModel):
     anchor_monthly: float | None = None
 
 
+class ExperienceEntry(BaseModel):
+    company: str
+    title: str
+    start: str | None = None
+    end: str | None = None
+    domain: list[str] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    highlights: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class EducationEntry(BaseModel):
+    institution: str
+    qualification: str
+    period: str | None = None
+
+
 class CareerProfile(BaseModel):
     profile_id: str
     display_name: str
+    headline: str | None = None
+    location: str | None = None
+    years_experience: float | None = None
     target_titles: list[str] = Field(default_factory=list)
     capabilities: list[Capability] = Field(default_factory=list)
     preferences: list[CareerPreference] = Field(default_factory=list)
+    experiences: list[ExperienceEntry] = Field(default_factory=list)
+    education: list[EducationEntry] = Field(default_factory=list)
+    portfolio_url: str | None = None
+    linkedin_url: str | None = None
     remote_only: bool = True
     allowed_regions: list[str] = Field(default_factory=lambda: ["worldwide", "remote"])
     compensation: CompensationPolicy = Field(default_factory=CompensationPolicy)
@@ -215,3 +239,51 @@ class ApplicationPlan(BaseModel):
     unknown_questions: list[ApplicationQuestion] = Field(default_factory=list)
     can_submit_automatically: bool = False
     reasons: list[str] = Field(default_factory=list)
+
+
+class ResumeExperience(BaseModel):
+    company: str
+    title: str
+    period: str | None = None
+    highlights: list[str] = Field(default_factory=list)
+
+
+class ResumePacket(BaseModel):
+    job_id: str
+    headline: str
+    summary: str
+    selected_skills: list[str] = Field(default_factory=list)
+    experiences: list[ResumeExperience] = Field(default_factory=list)
+    omitted_claims: list[str] = Field(default_factory=list)
+    markdown: str
+
+
+class RecruiterAdvice(BaseModel):
+    stage: Literal["unknown", "screening", "interview", "compensation", "offer", "follow_up"]
+    intent: str
+    leverage_signals: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    recommended_action: str
+    draft_reply: str
+
+
+class NegotiationContext(BaseModel):
+    current_offer_monthly: float | None = None
+    currency: str = "USD"
+    company_initiated: bool = False
+    interview_rounds: int = 0
+    urgency_signals: int = 0
+    strong_positive_signals: int = 0
+    competing_processes: int = 0
+    published_max_monthly: float | None = None
+    non_salary_priorities: list[str] = Field(default_factory=list)
+
+
+class NegotiationAdvice(BaseModel):
+    leverage: Literal["weak", "limited", "balanced", "strong", "very_strong"]
+    recommended_counter_monthly: float | None = None
+    walk_away_below_monthly: float | None = None
+    strategy: list[str] = Field(default_factory=list)
+    non_salary_levers: list[str] = Field(default_factory=list)
+    unknowns: list[str] = Field(default_factory=list)
+    requires_approval: bool = True

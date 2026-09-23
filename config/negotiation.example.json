@@ -1,0 +1,15 @@
+{
+  "current_offer_monthly": 6000,
+  "currency": "USD",
+  "company_initiated": true,
+  "interview_rounds": 3,
+  "urgency_signals": 1,
+  "strong_positive_signals": 2,
+  "competing_processes": 1,
+  "published_max_monthly": 8000,
+  "non_salary_priorities": [
+    "paid leave",
+    "working hour flexibility",
+    "equipment budget"
+  ]
+}

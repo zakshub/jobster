@@ -1,6 +1,11 @@
 profile_id: personal
 
 display_name: Example Candidate
+headline: Senior Product Designer
+location: Karachi, Pakistan
+years_experience: null
+portfolio_url: null
+linkedin_url: null
 
 target_titles:
   - Senior Product Designer
@@ -24,66 +29,50 @@ capabilities:
   - name: Product Design
     level: core
     confidence: high
-    aliases:
-      - product designer
-      - product design
+    aliases: [product designer, product design]
     evidence_ids: []
   - name: UX Architecture
     level: core
     confidence: high
-    aliases:
-      - ux architecture
-      - information architecture
-      - complex workflows
+    aliases: [ux architecture, information architecture, complex workflows]
     evidence_ids: []
   - name: Design Systems
     level: strong
     confidence: high
-    aliases:
-      - design system
-      - component library
+    aliases: [design system, component library]
     evidence_ids: []
   - name: Figma
     level: strong
     confidence: high
-    aliases:
-      - figma
-    evidence_ids: []
-  - name: Healthcare Product Design
-    level: strong
-    confidence: high
-    aliases:
-      - healthcare
-      - healthtech
-      - clinical
+    aliases: [figma]
     evidence_ids: []
 
 preferences:
   - name: Complex product systems
     weight: 4
-    keywords:
-      - complex workflows
-      - platform
-      - systems
-      - enterprise
+    keywords: [complex workflows, platform, systems, enterprise]
   - name: AI product work
     weight: 3
-    keywords:
-      - artificial intelligence
-      - ai product
-      - llm
-      - agent
-  - name: Design systems
-    weight: 3
-    keywords:
-      - design system
-      - component library
+    keywords: [artificial intelligence, ai product, llm, agent]
   - name: Generic marketing production
     weight: -4
-    keywords:
-      - social media graphics
-      - marketing banners
-      - ad creatives
-      - production designer
+    keywords: [social media graphics, marketing banners, ad creatives]
+
+experiences:
+  - company: Example Company
+    title: Senior Product Designer
+    start: "2024"
+    end: Present
+    domain: [SaaS]
+    skills: [Product Design, Figma]
+    highlights:
+      - Designed complex product workflows.
+      - Maintained a reusable design system.
+    evidence_ids: []
+
+education:
+  - institution: Example University
+    qualification: Example Degree
+    period: "2000-2004"
 
 evidence: []
