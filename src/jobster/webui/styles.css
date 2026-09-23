@@ -2573,3 +2573,155 @@ body::before {
   .notification-panel { top: 70px; right: 10px; }
 }
 
+
+
+/* Additional human-centered career workflow surfaces */
+.outreach-panel,
+.artifact-panel,
+.story-bank { margin-top: 14px; }
+
+.outreach-list,
+.artifact-list,
+.watch-rule-list { padding: 5px 18px 12px; }
+
+.outreach-row,
+.artifact-row,
+.watch-rule-row {
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 32px minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+}
+.outreach-row:last-child,
+.artifact-row:last-child,
+.watch-rule-row:last-child { border-bottom: 0; }
+
+.outreach-icon,
+.artifact-icon,
+.watch-rule-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ink-50);
+  color: var(--ink-700);
+}
+.outreach-icon svg,
+.artifact-icon svg,
+.watch-rule-icon svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+.outreach-row strong,
+.artifact-row strong,
+.watch-rule-row strong { display: block; font-size: 9px; }
+.outreach-row small,
+.artifact-row small,
+.watch-rule-row small { display: block; margin-top: 2px; color: var(--ink-500); font-size: 8px; }
+.queue-state {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: var(--ink-50);
+  color: var(--ink-600);
+  font-size: 8px;
+  text-transform: capitalize;
+}
+.queue-state.ready,
+.queue-state.sent { background: var(--green-100); color: var(--green-700); }
+
+.story-bank {
+  padding: 19px;
+  border-top: 1px solid #cec7bc;
+  border-bottom: 1px solid #cec7bc;
+  background: rgba(255,255,255,.23);
+}
+.story-bank-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+.story-bank-head h3 {
+  margin: 6px 0 4px;
+  font-family: Georgia,serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+.story-bank-head p { margin: 0; color: var(--ink-500); font-size: 8px; }
+.story-list {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 9px;
+  margin-top: 14px;
+}
+.story-card {
+  min-height: 150px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px 7px 13px 8px;
+  background: #fffdf8;
+}
+.story-card:nth-child(2n) { transform: rotate(.12deg); }
+.story-card h4 { margin: 0 0 7px; font-size: 10px; }
+.story-card p { margin: 0; color: var(--ink-600); font-size: 8px; line-height: 14px; }
+.story-skills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 10px; }
+.story-skills span { padding: 3px 5px; border-radius: 5px; background: var(--ink-50); color: var(--ink-500); font-size: 7px; }
+
+.artifact-row {
+  grid-template-columns: 30px minmax(0,1fr) 120px;
+}
+.artifact-path {
+  color: var(--ink-400);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.watch-rule-row { grid-template-columns: 30px minmax(0,1fr) auto; }
+.watch-rule-criteria { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+.watch-rule-criteria span { padding: 3px 5px; border-radius: 5px; background: var(--ink-50); color: var(--ink-500); font-size: 7px; }
+
+.emergency-panel {
+  position: relative;
+  overflow: hidden;
+  background: #19191c;
+  color: #fff;
+  border-color: #242428;
+}
+.emergency-panel .card-head { border-color: rgba(255,255,255,.08); }
+.emergency-panel .eyebrow { color: rgba(255,255,255,.34); }
+.emergency-panel h3 { color: #fff; }
+.emergency-copy {
+  display: grid;
+  grid-template-columns: 38px minmax(0,1fr);
+  gap: 11px;
+  padding: 17px 18px 12px;
+}
+.emergency-copy strong { font-size: 9px; }
+.emergency-copy p { margin: 4px 0 0; color: rgba(255,255,255,.48); font-size: 8px; line-height: 14px; }
+.emergency-button {
+  margin: 0 18px 18px;
+  border-color: rgba(255,255,255,.12);
+  background: #a4473e;
+  color: #fff;
+}
+.emergency-button:hover { background: #913d35; }
+
+@media (max-width: 980px) {
+  .story-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 720px) {
+  .story-list { grid-template-columns: 1fr; }
+  .artifact-row { grid-template-columns: 30px minmax(0,1fr); }
+  .artifact-path { grid-column: 2; text-align: left; }
+}
