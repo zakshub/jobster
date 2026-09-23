@@ -382,6 +382,13 @@
             <div class="empty-state">No applications prepared yet.</div>
           </div>
         </div>
+        <section class="panel artifact-panel">
+          <div class="card-head">
+            <div><div class="eyebrow">APPLICATION FILES</div><h3>What Jobster prepared</h3></div>
+            <span class="authority-note">Resume and decision files are kept with the job</span>
+          </div>
+          <div class="artifact-list" id="artifact-list"></div>
+        </section>
       </section>
 
       <section class="view" id="view-attention">
@@ -456,6 +463,13 @@
             <div class="advisor-result" id="recruiter-advice"></div>
           </section>
         </div>
+        <section class="panel outreach-panel">
+          <div class="card-head">
+            <div><div class="eyebrow">OUTREACH QUEUE</div><h3>Messages prepared, not blindly sent</h3></div>
+            <button class="text-button" id="add-outreach-btn"><svg><use href="#i-plus"></use></svg> Add draft</button>
+          </div>
+          <div class="outreach-list" id="outreach-list"></div>
+        </section>
       </section>
 
       <section class="view" id="view-interviews">
@@ -468,6 +482,13 @@
           <button class="button button-primary" id="add-interview-btn"><svg><use href="#i-plus"></use></svg><span>Add interview</span></button>
         </div>
         <div class="interview-board" id="interviews-list"></div>
+        <section class="story-bank">
+          <div class="story-bank-head">
+            <div><div class="eyebrow">STAR STORY BANK</div><h3>Real examples you can reuse in interviews.</h3><p>Keep strong work stories structured so the right example is easy to find under pressure.</p></div>
+            <button class="button button-secondary" id="add-story-btn"><svg><use href="#i-plus"></use></svg><span>Add story</span></button>
+          </div>
+          <div class="story-list" id="story-list"></div>
+        </section>
       </section>
 
       <section class="view" id="view-offers">
@@ -649,6 +670,24 @@
             <div class="card-head"><div><div class="eyebrow">APPLICATION SAFETY</div><h3>How applications are controlled</h3></div></div>
             <div class="settings-list" id="settings-apps"></div>
           </section>
+          <section class="panel">
+            <div class="card-head">
+              <div><div class="eyebrow">WATCH RULES</div><h3>Things worth watching for</h3></div>
+              <button class="text-button" id="add-watch-rule-btn"><svg><use href="#i-plus"></use></svg> Add rule</button>
+            </div>
+            <div class="watch-rule-list" id="watch-rule-list"></div>
+          </section>
+
+          <section class="panel emergency-panel">
+            <div class="card-head"><div><div class="eyebrow">EMERGENCY CONTROL</div><h3>Stop every automatic action</h3></div></div>
+            <div class="emergency-copy">
+              <span class="principle-icon coral"><svg><use href="#i-alert"></use></svg></span>
+              <div><strong>Emergency stop</strong><p>Turns off searching, preparation, submission, contact and follow-up permissions. Nothing is deleted.</p></div>
+            </div>
+            <button class="button emergency-button" id="emergency-stop-btn">Stop automation</button>
+          </section>
+
+
           <section class="panel">
             <div class="card-head"><div><div class="eyebrow">INTERFACE</div><h3>Your display preferences</h3></div></div>
             <div class="preference-controls">
