@@ -148,3 +148,67 @@ def _output_text(payload: dict) -> str:
             if content.get("type") == "output_text" and content.get("text"):
                 return content["text"]
     raise RuntimeError("Semantic provider returned no output text")
+
+
+_BILLING_OR_QUOTA_CODES = {
+    "credit_balance_exhausted",
+    "organization_usage_limit_exceeded",
+    "organization_spend_limit_exceeded",
+    "project_spend_limit_exceeded",
+    "insufficient_quota",
+}
+
+
+def friendly_semantic_error(exc: Exception) -> dict:
+    """Return a plain-English explanation for an AI review failure."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        response = exc.response
+        status = response.status_code
+        code = None
+        message = ""
+        try:
+            payload = response.json()
+            error = payload.get("error") or {}
+            code = error.get("code") or error.get("type")
+            message = str(error.get("message") or "")
+        except Exception:
+            pass
+
+        if status == 429:
+            if code in _BILLING_OR_QUOTA_CODES:
+                return {
+                    "kind": "usage_limit",
+                    "message": "AI job review is temporarily unavailable because the OpenAI API account has reached a credit or spending limit.",
+                    "code": code,
+                }
+            return {
+                "kind": "rate_limit",
+                "message": "AI job review is temporarily busy because too many OpenAI API requests were made in a short time.",
+                "code": code,
+            }
+
+        return {
+            "kind": "api_error",
+            "message": f"AI job review is temporarily unavailable (OpenAI API error {status}).",
+            "code": code,
+        }
+
+    if isinstance(exc, httpx.TimeoutException):
+        return {
+            "kind": "timeout",
+            "message": "AI job review took too long to respond, so Jobster will continue with its basic review.",
+            "code": None,
+        }
+
+    if isinstance(exc, httpx.HTTPError):
+        return {
+            "kind": "connection",
+            "message": "AI job review could not connect right now, so Jobster will continue with its basic review.",
+            "code": None,
+        }
+
+    return {
+        "kind": "unknown",
+        "message": "AI job review is temporarily unavailable, so Jobster will continue with its basic review.",
+        "code": None,
+    }

@@ -379,9 +379,27 @@ function appendTerminalEvent(item) {
   line.className = `terminal-line ${tone}`;
   const stamp = new Date(item.timestamp);
   const time = Number.isNaN(stamp.getTime()) ? "--:--:--" : stamp.toLocaleTimeString([], { hour12: false });
+  const friendlyEvents = {
+    cycle_requested: "search requested",
+    cycle_started: "search started",
+    source_started: "checking source",
+    source_completed: "source checked",
+    source_failed: "source problem",
+    discovery_completed: "jobs collected",
+    intake_completed: "unrelated jobs removed",
+    evaluation_started: "checking job fit",
+    evaluation_completed: "job reviewed",
+    ai_review_paused: "AI review paused",
+    application_preflight_started: "checking application",
+    verification_started: "checking job page",
+    verification_completed: "job page checked",
+    cycle_completed: "search finished",
+    cycle_failed: "search stopped",
+  };
+  const eventLabel = friendlyEvents[item.event] || item.event.replaceAll("_", " ");
   line.innerHTML = `
     <span class="time">${esc(time)}</span>
-    <span class="event">${esc(event)}</span>
+    <span class="event">${esc(eventLabel)}</span>
     <span class="message">${esc(item.message)}</span>
   `;
   body.appendChild(line);

@@ -9,7 +9,7 @@ from .models import CareerProfile, PursuitDecision
 from .orchestrator import process_applications
 from .quota import SerpApiQuota
 from .relevance import select_relevant_jobs
-from .semantic import SemanticCareerBrain
+from .semantic import SemanticCareerBrain, friendly_semantic_error
 from .settings import SearchConfig
 from .sources import (
     HimalayasSource,
@@ -147,6 +147,8 @@ def run_cycle(
 
     evaluations = []
     total = len(jobs)
+    semantic_enabled = bool(config.application.semantic_reasoning and semantic_brain.available)
+    semantic_pause: dict | None = None
     for index, job in enumerate(jobs, start=1):
         emit(
             "evaluation_started",
@@ -161,11 +163,34 @@ def run_cycle(
         )
         store.save_job(job)
         baseline = baseline_brain.evaluate(profile, job)
-        evaluation = (
-            semantic_brain.evaluate(profile, job, baseline)
-            if config.application.semantic_reasoning and baseline.eligible
-            else baseline
-        )
+        review_mode = "basic"
+        evaluation = baseline
+        if semantic_enabled and baseline.eligible:
+            try:
+                evaluation = semantic_brain.evaluate(profile, job, baseline)
+                review_mode = "ai"
+            except Exception as exc:
+                semantic_pause = friendly_semantic_error(exc)
+                semantic_enabled = False
+                store.audit(
+                    "ai_review_paused",
+                    {
+                        "reason": semantic_pause["message"],
+                        "kind": semantic_pause["kind"],
+                        "code": semantic_pause.get("code"),
+                    },
+                    job_id=job.id,
+                )
+                emit(
+                    "ai_review_paused",
+                    {
+                        "job_id": job.id,
+                        "title": job.title,
+                        "company": job.company,
+                        "reason": semantic_pause["message"],
+                        "kind": semantic_pause["kind"],
+                    },
+                )
         store.save_evaluation(evaluation)
         store.audit(
             "job_evaluated",
@@ -188,6 +213,7 @@ def run_cycle(
                 "company": job.company,
                 "decision": evaluation.pursuit_decision.value,
                 "interest_score": evaluation.interest_score,
+                "review_mode": review_mode,
             },
         )
 
@@ -211,6 +237,8 @@ def run_cycle(
         "admitted_by_source": admitted_by_source,
         "decisions": counts,
         "applications": applications,
+        "ai_review_paused": semantic_pause is not None,
+        "ai_review_reason": semantic_pause["message"] if semantic_pause else None,
     }
     store.audit("discovery_cycle_completed", summary)
     emit("cycle_completed", summary)
