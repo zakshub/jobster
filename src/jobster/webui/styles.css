@@ -2725,3 +2725,68 @@ body::before {
   .artifact-row { grid-template-columns: 30px minmax(0,1fr); }
   .artifact-path { grid-column: 2; text-align: left; }
 }
+
+
+.confidence-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+.confidence-line span { color: var(--ink-500); font-size: 8px; }
+.confidence-line strong { font-family: Georgia,serif; font-size: 18px; font-weight: 600; }
+
+.requirement-list { display: grid; gap: 5px; margin-top: 11px; }
+.requirement-row {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-muted);
+}
+.requirement-row strong { display: block; font-size: 8px; line-height: 12px; }
+.requirement-row small { display: block; margin-top: 1px; color: var(--ink-500); font-size: 7px; line-height: 11px; }
+.fit-pill {
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: var(--ink-100);
+  color: var(--ink-600);
+  font-size: 7px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.fit-pill.strong_evidence,
+.fit-pill.supported { background: var(--green-100); color: var(--green-700); }
+.fit-pill.learnable,
+.fit-pill.adjacent { background: var(--amber-100); color: var(--amber-700); }
+.fit-pill.hard_blocker,
+.fit-pill.not_claimed { background: var(--red-100); color: var(--red-700); }
+
+.career-value-strip {
+  display: grid;
+  grid-template-columns: repeat(5,minmax(0,1fr));
+  gap: 5px;
+  margin-top: 12px;
+}
+.career-value-item {
+  padding: 7px;
+  border-top: 2px solid var(--ink-200);
+  background: rgba(255,255,255,.45);
+}
+.career-value-item.good,
+.career-value-item.strong,
+.career-value-item.high { border-top-color: var(--lime); }
+.career-value-item.poor,
+.career-value-item.weak,
+.career-value-item.low { border-top-color: var(--coral); }
+.career-value-item strong { display: block; font-size: 7px; text-transform: uppercase; letter-spacing: .04em; }
+.career-value-item span { display: block; margin-top: 2px; color: var(--ink-500); font-size: 7px; text-transform: capitalize; }
+
+@media (max-width: 560px) {
+  .career-value-strip { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
