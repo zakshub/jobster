@@ -238,3 +238,109 @@ def test_attention_queue_lists_blocked_application(tmp_path, monkeypatch):
 
     status = client.get("/api/status").json()
     assert status["metrics"]["needs_you"] == 1
+
+
+def test_omni_career_endpoints(tmp_path, monkeypatch):
+    db_path = configure_runtime(tmp_path, monkeypatch)
+    seed(db_path)
+    client = TestClient(app)
+
+    missions = client.get("/api/missions")
+    assert missions.status_code == 200
+    assert missions.json()
+
+    insights = client.get("/api/insights")
+    assert insights.status_code == 200
+    assert "funnel" in insights.json()
+    assert "sources" in insights.json()
+    assert "salary" in insights.json()
+
+    companies = client.get("/api/companies")
+    assert companies.status_code == 200
+    assert any(item["company"] == "Acme Health" for item in companies.json())
+
+    watched = client.post("/api/companies/watch", json={"company": "Acme Health", "watching": True})
+    assert watched.status_code == 200
+    assert watched.json()["watching"] is True
+
+    feedback = client.post(
+        "/api/feedback",
+        json={"job_id": "job-1", "reaction": "interesting"},
+    )
+    assert feedback.status_code == 200
+    assert feedback.json()["reaction"] == "interesting"
+
+    contact = client.post(
+        "/api/contacts",
+        json={"name": "Jane Recruiter", "company": "Acme Health", "role": "Recruiter"},
+    )
+    assert contact.status_code == 200
+    assert contact.json()["name"] == "Jane Recruiter"
+    assert len(client.get("/api/contacts").json()) == 1
+
+    interview = client.post(
+        "/api/interviews",
+        json={"company": "Acme Health", "title": "Senior Product Designer", "status": "planned"},
+    )
+    assert interview.status_code == 200
+    assert len(client.get("/api/interviews").json()) == 1
+
+    offer = client.post(
+        "/api/offers",
+        json={
+            "company": "Acme Health",
+            "title": "Senior Product Designer",
+            "currency": "USD",
+            "monthly_base": 6000,
+        },
+    )
+    assert offer.status_code == 200
+    offer_id = offer.json()["id"]
+    advice = client.post(f"/api/offers/{offer_id}/advice", json={})
+    assert advice.status_code == 200
+    assert "leverage" in advice.json()
+
+    goal = client.post(
+        "/api/goals",
+        json={"label": "Move into a stronger global product role", "horizon": "3_months"},
+    )
+    assert goal.status_code == 200
+    assert len(client.get("/api/goals").json()) == 1
+
+    authority = client.get("/api/authority")
+    assert authority.status_code == 200
+    assert authority.json()["submit"]["enabled"] is False
+
+    update = client.post(
+        "/api/authority/prepare",
+        json={"enabled": False, "requires_approval": True},
+    )
+    assert update.status_code == 200
+    assert update.json()["enabled"] is False
+
+    export = client.get("/api/export")
+    assert export.status_code == 200
+    payload = export.json()
+    assert "jobs" in payload
+    assert "contacts" in payload
+    assert "offers" in payload
+
+
+def test_recruiter_message_advice_endpoint(tmp_path, monkeypatch):
+    configure_runtime(tmp_path, monkeypatch)
+    client = TestClient(app)
+    response = client.post(
+        "/api/recruiter/advice",
+        json={"message": "We would like to invite you to an interview with the hiring manager."},
+    )
+    assert response.status_code == 200
+    assert response.json()["stage"] == "interview"
+
+
+def test_pwa_files_are_served(tmp_path, monkeypatch):
+    configure_runtime(tmp_path, monkeypatch)
+    client = TestClient(app)
+    manifest = client.get("/manifest.webmanifest")
+    assert manifest.status_code == 200
+    service_worker = client.get("/service-worker.js")
+    assert service_worker.status_code == 200
