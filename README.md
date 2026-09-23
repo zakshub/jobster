@@ -40,16 +40,19 @@ jobster ui
 
 Then open `http://127.0.0.1:8765`.
 
+The UI now uses a strict career-lane intake gate before semantic evaluation, so broad job-board feeds do not flood the database with unrelated engineering, sales, HR, support or course/content roles. It also includes a draggable/resizable live research terminal and on-demand source verification.
+
 The UI provides:
 
-- overview metrics and operating status
-- live opportunity list with CareerBrain output
+- overview metrics, noise-blocked count, source diversity and operating status
+- live opportunity list with CareerBrain output and strict role relevance
 - job detail drawer with matches, gaps and next action
 - application-plan states and blockers
 - audit activity
 - SerpAPI budget visibility
 - submission-window visibility
-- supervised "Run search cycle" control
+- one-click targeted research with a draggable/resizable live terminal
+- source verification before application preparation
 - application-packet preparation for evaluated jobs
 
 The UI does not expose private keys, internal prompts or hidden reasoning.
