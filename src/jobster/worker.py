@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 from .profile import load_profile
-from .runner import run_cycle
+from .runner import build_sources, run_cycle
 from .settings import load_search_config
 from .storage import JobsterStore
 
@@ -21,13 +21,25 @@ def main():
     store = JobsterStore(db_path)
     store.init()
 
+    # Build once so source-level caches persist across the long-running worker.
+    sources = build_sources(config)
+
     while True:
         try:
-            summary = run_cycle(profile, config, store)
-            print(json.dumps({"event": "cycle_completed", **summary}, sort_keys=True), flush=True)
+            summary = run_cycle(profile, config, store, sources=sources)
+            print(
+                json.dumps({"event": "cycle_completed", **summary}, sort_keys=True),
+                flush=True,
+            )
         except Exception as exc:
             store.audit("cycle_failed", {"error": str(exc)})
-            print(json.dumps({"event": "cycle_failed", "error": str(exc)}), flush=True)
+            print(
+                json.dumps(
+                    {"event": "cycle_failed", "error": str(exc)},
+                    sort_keys=True,
+                ),
+                flush=True,
+            )
         time.sleep(config.cycle_minutes * 60)
 
 
