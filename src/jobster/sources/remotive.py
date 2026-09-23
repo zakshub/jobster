@@ -5,6 +5,7 @@ import html
 import httpx
 
 from jobster.models import Job
+from jobster.text_utils import repair_text
 from .base import JobSource
 
 
@@ -19,10 +20,10 @@ def parse_remotive(payload: dict) -> list[Job]:
         jobs.append(
             Job(
                 id=f"remotive:{item['id']}",
-                title=str(item.get("title") or ""),
-                company=str(item.get("company_name") or "Unknown company"),
+                title=repair_text(item.get("title") or ""),
+                company=repair_text(item.get("company_name") or "Unknown company"),
                 description=html.unescape(str(item.get("description") or "")),
-                location=str(item.get("candidate_required_location") or "Remote"),
+                location=repair_text(item.get("candidate_required_location") or "Remote"),
                 remote=True,
                 source="remotive",
                 url=item.get("url"),
