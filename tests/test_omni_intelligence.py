@@ -51,6 +51,7 @@ def profile() -> CareerProfile:
                 statement="Built and maintained a production design system.",
                 evidence_class=EvidenceClass.PROFESSIONAL_RECORD,
                 source="Career Master File",
+                domain="product_design",
                 confidence=0.95,
             )
         ],
