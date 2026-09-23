@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from .application_policy import normalize_question
+from .field_keys import normalize_question
 from .models import ApplicationAnswer
 
 

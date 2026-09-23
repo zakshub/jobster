@@ -3,8 +3,9 @@ from __future__ import annotations
 import re
 
 from .answer_bank import answer_lookup
-from .models import ApplicationAnswer, ApplicationPlan, ApplicationQuestion, ApplicationState, Job
 from .ats import detect_ats
+from .field_keys import normalize_question
+from .models import ApplicationAnswer, ApplicationPlan, ApplicationQuestion, ApplicationState, Job
 
 
 SENSITIVE_PATTERNS = {
@@ -17,10 +18,6 @@ SENSITIVE_PATTERNS = {
     "criminal_history": [r"convicted", r"criminal", r"felony"],
     "relocation": [r"relocat"],
 }
-
-
-def normalize_question(label: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
 
 
 def sensitive_category(label: str) -> str | None:

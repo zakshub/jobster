@@ -1,4 +1,5 @@
-from jobster.application_policy import build_application_plan, normalize_question, sensitive_category
+from jobster.application_policy import build_application_plan, sensitive_category
+from jobster.field_keys import normalize_question
 from jobster.models import ApplicationAnswer, ApplicationQuestion, ApplicationState, Job
 
 

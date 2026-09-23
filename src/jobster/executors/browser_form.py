@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from jobster.application_policy import normalize_question
 from jobster.ats import detect_ats
+from jobster.field_keys import normalize_question
 from jobster.models import ApplicationPlan, ApplicationQuestion, Job
 from .base import ApplicationExecutor, ExecutorCapability
 
