@@ -2,6 +2,7 @@ from jobster.intelligence import (
     build_daily_missions,
     build_insights,
     build_salary_intelligence,
+    diagnose_bottleneck,
 )
 from jobster.models import (
     CareerProfile,
@@ -103,3 +104,18 @@ def test_daily_missions_surface_strong_opportunity(tmp_path):
     assert missions
     assert missions[0]["kind"] == "opportunity"
     assert missions[0]["job_id"] == "j1"
+
+
+def test_bottleneck_diagnosis_is_plain_and_stage_specific():
+    result = diagnose_bottleneck(
+        {
+            "reviewed": 20,
+            "worth_pursuing": 5,
+            "applications": 5,
+            "submitted": 5,
+            "interviews": 0,
+            "offers": 0,
+        }
+    )
+    assert result["stage"] == "response"
+    assert "recruiter response" in result["title"].lower()
