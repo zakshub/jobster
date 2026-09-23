@@ -189,6 +189,31 @@ CREATE TABLE IF NOT EXISTS watch_rules (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS job_archive (
+    job_id TEXT PRIMARY KEY,
+    archived INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+CREATE TABLE IF NOT EXISTS decision_journal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL,
+    decision TEXT NOT NULL,
+    reason TEXT,
+    note TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+CREATE TABLE IF NOT EXISTS learning_proposals (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    detail TEXT NOT NULL,
+    evidence TEXT,
+    status TEXT NOT NULL DEFAULT 'suggested',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -418,12 +443,14 @@ class JobsterStore:
                     v.checked_at AS verification_checked_at,
                     COALESCE(pref.saved, 0) AS saved,
                     COALESCE(pref.dismissed, 0) AS dismissed,
-                    pref.note AS preference_note
+                    pref.note AS preference_note,
+                    COALESCE(arch.archived, 0) AS archived
                 FROM jobs j
                 LEFT JOIN evaluations e ON e.job_id = j.id
                 LEFT JOIN application_plans p ON p.job_id = j.id
                 LEFT JOIN job_verifications v ON v.job_id = j.id
                 LEFT JOIN job_preferences pref ON pref.job_id = j.id
+                LEFT JOIN job_archive arch ON arch.job_id = j.id
                 ORDER BY
                     CASE e.decision
                         WHEN 'aggressive_pursuit' THEN 0
@@ -473,6 +500,7 @@ class JobsterStore:
                     "saved": bool(row["saved"]),
                     "dismissed": bool(row["dismissed"]),
                     "note": row["preference_note"],
+                    "archived": bool(row["archived"]),
                     "updated_at": row["updated_at"],
                 }
             )
@@ -493,12 +521,14 @@ class JobsterStore:
                     v.checked_at AS verification_checked_at,
                     COALESCE(pref.saved, 0) AS saved,
                     COALESCE(pref.dismissed, 0) AS dismissed,
-                    pref.note AS preference_note
+                    pref.note AS preference_note,
+                    COALESCE(arch.archived, 0) AS archived
                 FROM jobs j
                 LEFT JOIN evaluations e ON e.job_id = j.id
                 LEFT JOIN application_plans p ON p.job_id = j.id
                 LEFT JOIN job_verifications v ON v.job_id = j.id
                 LEFT JOIN job_preferences pref ON pref.job_id = j.id
+                LEFT JOIN job_archive arch ON arch.job_id = j.id
                 WHERE j.id = ?
                 """,
                 (job_id,),
@@ -537,6 +567,7 @@ class JobsterStore:
                 "saved": bool(row["saved"]),
                 "dismissed": bool(row["dismissed"]),
                 "note": row["preference_note"],
+                "archived": bool(row["archived"]),
             },
         }
 
@@ -1158,6 +1189,132 @@ class JobsterStore:
             }
             for row in rows
         ]
+
+
+
+    def set_job_archived(self, job_id: str, archived: bool) -> dict:
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO job_archive(job_id, archived)
+                VALUES (?, ?)
+                ON CONFLICT(job_id) DO UPDATE SET
+                  archived=excluded.archived,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (job_id, 1 if archived else 0),
+            )
+        result = {"job_id": job_id, "archived": bool(archived)}
+        self.audit("job_archive_updated", result, job_id=job_id)
+        return result
+
+    def add_decision_journal(
+        self,
+        job_id: str,
+        decision: str,
+        reason: str | None = None,
+        note: str | None = None,
+    ) -> dict:
+        with self.connect() as con:
+            cur = con.execute(
+                """INSERT INTO decision_journal(job_id, decision, reason, note)
+                VALUES (?, ?, ?, ?)""",
+                (job_id, decision, reason, note),
+            )
+            row_id = cur.lastrowid
+            row = con.execute(
+                """SELECT id, job_id, decision, reason, note, created_at
+                FROM decision_journal WHERE id = ?""",
+                (row_id,),
+            ).fetchone()
+        result = dict(row)
+        self.audit("decision_journal_added", result, job_id=job_id)
+        return result
+
+    def list_decision_journal(
+        self,
+        job_id: str | None = None,
+        limit: int = 200,
+    ) -> list[dict]:
+        with self.connect() as con:
+            if job_id:
+                rows = con.execute(
+                    """SELECT id, job_id, decision, reason, note, created_at
+                    FROM decision_journal
+                    WHERE job_id = ?
+                    ORDER BY id DESC
+                    LIMIT ?""",
+                    (job_id, limit),
+                ).fetchall()
+            else:
+                rows = con.execute(
+                    """SELECT id, job_id, decision, reason, note, created_at
+                    FROM decision_journal
+                    ORDER BY id DESC
+                    LIMIT ?""",
+                    (limit,),
+                ).fetchall()
+        return [dict(row) for row in rows]
+
+    def upsert_learning_proposal(self, payload: dict) -> dict:
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO learning_proposals(id, kind, title, detail, evidence, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  kind=excluded.kind,
+                  title=excluded.title,
+                  detail=excluded.detail,
+                  evidence=excluded.evidence,
+                  status=CASE
+                    WHEN learning_proposals.status IN ('approved', 'rejected')
+                    THEN learning_proposals.status
+                    ELSE excluded.status
+                  END,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (
+                    payload["id"],
+                    payload["kind"],
+                    payload["title"],
+                    payload["detail"],
+                    payload.get("evidence"),
+                    payload.get("status", "suggested"),
+                ),
+            )
+            row = con.execute(
+                """SELECT id, kind, title, detail, evidence, status, created_at, updated_at
+                FROM learning_proposals WHERE id = ?""",
+                (payload["id"],),
+            ).fetchone()
+        return dict(row)
+
+    def set_learning_proposal_status(self, proposal_id: str, status: str) -> dict | None:
+        if status not in {"suggested", "approved", "rejected"}:
+            raise ValueError("status must be suggested, approved, or rejected")
+        with self.connect() as con:
+            con.execute(
+                """UPDATE learning_proposals
+                SET status = ?, updated_at=CURRENT_TIMESTAMP
+                WHERE id = ?""",
+                (status, proposal_id),
+            )
+            row = con.execute(
+                """SELECT id, kind, title, detail, evidence, status, created_at, updated_at
+                FROM learning_proposals WHERE id = ?""",
+                (proposal_id,),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def list_learning_proposals(self, limit: int = 100) -> list[dict]:
+        with self.connect() as con:
+            rows = con.execute(
+                """SELECT id, kind, title, detail, evidence, status, created_at, updated_at
+                FROM learning_proposals
+                ORDER BY
+                  CASE status WHEN 'suggested' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+                  updated_at DESC
+                LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def emergency_stop(self) -> dict:
         actions = ("search", "prepare", "submit", "contact", "follow_up")

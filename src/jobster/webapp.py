@@ -16,6 +16,15 @@ from .answer_bank import load_answer_bank
 from .application_packet import build_application_packet
 from .intelligence import build_daily_missions, build_evidence_snapshot, build_insights
 from .models import Job, JobEvaluation, NegotiationContext
+from .omni_intelligence import (
+    build_career_graph,
+    build_data_health,
+    build_decision_brief,
+    build_job_explanation,
+    build_learning_suggestions,
+    build_portfolio_map,
+    build_search_history,
+)
 from .negotiation import negotiation_advice
 from .recruiter import advise_recruiter_message
 from .profile import load_profile
@@ -682,6 +691,101 @@ def create_app() -> FastAPI:
         _, _, store = _runtime()
         return store.emergency_stop()
 
+
+    @app.get("/api/omni/graph")
+    def omni_graph():
+        profile, _, store = _runtime()
+        return build_career_graph(profile, store)
+
+    @app.get("/api/omni/portfolio")
+    def omni_portfolio():
+        profile, _, store = _runtime()
+        return build_portfolio_map(profile, store)
+
+    @app.get("/api/omni/data-health")
+    def omni_data_health():
+        profile, _, store = _runtime()
+        return build_data_health(profile, store)
+
+    @app.get("/api/omni/learning")
+    def omni_learning():
+        profile, _, store = _runtime()
+        suggestions = build_learning_suggestions(profile, store)
+        for suggestion in suggestions:
+            stored = store.upsert_learning_proposal({
+                **suggestion,
+                "status": "suggested",
+            })
+            suggestion["status"] = stored.get("status", "suggested")
+        return {
+            "suggestions": suggestions,
+            "rule": "Suggestions never change the Career Brain unless the user approves them.",
+        }
+
+    @app.post("/api/omni/learning/{proposal_id}/decision")
+    def decide_learning(proposal_id: str, payload: dict):
+        _, _, store = _runtime()
+        status = str(payload.get("status") or "").strip().lower()
+        if status not in {"approved", "rejected"}:
+            raise HTTPException(status_code=400, detail="Choose approved or rejected.")
+        try:
+            result = store.set_learning_proposal_status(proposal_id, status)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        if result is None:
+            raise HTTPException(status_code=404, detail="Learning suggestion not found")
+        store.audit("learning_suggestion_decided", result)
+        return result
+
+    @app.get("/api/search-history")
+    def search_history(limit: int = 30):
+        _, _, store = _runtime()
+        return build_search_history(store, limit=min(max(limit, 1), 100))
+
+    @app.get("/api/system/usage")
+    def system_usage():
+        profile, config, store = _runtime()
+        quota = _quota_payload(config)
+        metrics = store.dashboard_metrics()
+        return {
+            "search": {
+                "used": quota["used"],
+                "usable_limit": quota["usable_limit"],
+                "used_today": quota["used_today"],
+                "daily_limit": quota["daily_limit"],
+            },
+            "advanced_review": {
+                "available": bool(os.getenv("OPENAI_API_KEY")),
+                "exact_cost_tracking": False,
+                "detail": "Jobster can see whether advanced review is available, but it does not guess provider billing or token cost.",
+            },
+            "stored": {
+                "jobs": metrics.get("jobs", 0),
+                "evaluations": metrics.get("evaluated", 0),
+                "applications": metrics.get("applications", 0),
+            },
+        }
+
+    @app.get("/api/integrations")
+    def integrations():
+        return {
+            "email": {
+                "connected": False,
+                "status": "connection_required",
+                "detail": "Recruiter outreach drafts are available. Sending needs an authenticated mail connection.",
+            },
+            "calendar": {
+                "connected": False,
+                "status": "connection_required",
+                "detail": "Interview records are available. Live calendar sync needs a calendar connection.",
+            },
+            "linkedin_messaging": {
+                "connected": False,
+                "status": "not_implemented",
+                "detail": "Jobster does not claim direct LinkedIn messaging or private-message access.",
+            },
+        }
+
     @app.get("/api/jobs")
     def jobs(limit: int = 100, offset: int = 0, include_irrelevant: bool = False):
         profile, config, store = _runtime()
@@ -825,6 +929,55 @@ def create_app() -> FastAPI:
         if result is None:
             raise HTTPException(status_code=404, detail="Job not found")
         return result
+
+
+    @app.get("/api/jobs/{job_id}/explain")
+    def explain_job(job_id: str):
+        profile, _, store = _runtime()
+        result = build_job_explanation(profile, store, job_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return result
+
+    @app.get("/api/jobs/{job_id}/decision-brief")
+    def decision_brief(job_id: str):
+        profile, _, store = _runtime()
+        result = build_decision_brief(profile, store, job_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return result
+
+    @app.get("/api/jobs/{job_id}/journal")
+    def decision_journal(job_id: str, limit: int = 100):
+        _, _, store = _runtime()
+        if store.get_job_bundle(job_id) is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return store.list_decision_journal(
+            job_id=job_id,
+            limit=min(max(limit, 1), 300),
+        )
+
+    @app.post("/api/jobs/{job_id}/journal")
+    def add_decision_journal(job_id: str, payload: dict):
+        _, _, store = _runtime()
+        if store.get_job_bundle(job_id) is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        decision = str(payload.get("decision") or "").strip()
+        if not decision:
+            raise HTTPException(status_code=400, detail="Decision is required")
+        reason = str(payload.get("reason") or "").strip() or None
+        note = str(payload.get("note") or "").strip() or None
+        return store.add_decision_journal(job_id, decision, reason, note)
+
+    @app.post("/api/jobs/{job_id}/archive")
+    def archive_job(job_id: str, payload: dict):
+        _, _, store = _runtime()
+        if store.get_job_bundle(job_id) is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        archived = payload.get("archived")
+        if not isinstance(archived, bool):
+            raise HTTPException(status_code=400, detail="archived must be true or false")
+        return store.set_job_archived(job_id, archived)
 
     @app.post("/api/jobs/{job_id}/preference")
     def update_job_preference(job_id: str, payload: dict):

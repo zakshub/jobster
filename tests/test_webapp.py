@@ -394,3 +394,55 @@ def test_extended_career_workflow_endpoints(tmp_path, monkeypatch):
     assert stopped.status_code == 200
     authority = client.get("/api/authority").json()
     assert all(not authority[key]["enabled"] for key in ("search", "prepare", "submit", "contact", "follow_up"))
+
+
+def test_omni_intelligence_endpoints(tmp_path, monkeypatch):
+    db_path = configure_runtime(tmp_path, monkeypatch)
+    seed(db_path)
+    client = TestClient(app)
+
+    graph = client.get("/api/omni/graph")
+    assert graph.status_code == 200
+    assert "nodes" in graph.json()
+
+    health = client.get("/api/omni/data-health")
+    assert health.status_code == 200
+    assert 0 <= health.json()["score"] <= 100
+
+    portfolio = client.get("/api/omni/portfolio")
+    assert portfolio.status_code == 200
+    assert "capabilities" in portfolio.json()
+
+    learning = client.get("/api/omni/learning")
+    assert learning.status_code == 200
+    assert "suggestions" in learning.json()
+
+    explanation = client.get("/api/jobs/job-1/explain")
+    assert explanation.status_code == 200
+    assert explanation.json()["decision"] == "high_priority"
+
+    brief = client.get("/api/jobs/job-1/decision-brief")
+    assert brief.status_code == 200
+    assert "headline" in brief.json()
+
+    journal = client.post(
+        "/api/jobs/job-1/journal",
+        json={"decision": "pursue", "reason": "Strong healthcare fit"},
+    )
+    assert journal.status_code == 200
+    assert journal.json()["decision"] == "pursue"
+
+    archived = client.post(
+        "/api/jobs/job-1/archive",
+        json={"archived": True},
+    )
+    assert archived.status_code == 200
+    assert archived.json()["archived"] is True
+
+    usage = client.get("/api/system/usage")
+    assert usage.status_code == 200
+    assert "search" in usage.json()
+
+    integrations = client.get("/api/integrations")
+    assert integrations.status_code == 200
+    assert integrations.json()["email"]["connected"] is False
