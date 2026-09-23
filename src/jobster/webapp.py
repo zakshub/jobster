@@ -101,7 +101,8 @@ class CycleController:
             "discovery_completed": f"Discovery collected {payload.get('deduped', 0)} unique jobs",
             "intake_completed": f"Strict intake admitted {payload.get('admitted', 0)} of {payload.get('raw', 0)} jobs",
             "evaluation_started": f"CareerBrain evaluating {payload.get('title', 'job')} at {payload.get('company', 'company')}",
-            "evaluation_completed": f"Scored {payload.get('title', 'job')} · {payload.get('interest_score', '—')}/100 · {payload.get('decision', 'pending')}",
+            "evaluation_completed": f"Finished checking {payload.get('title', 'job')} · {payload.get('interest_score', '—')}/100 · {payload.get('decision', 'pending')}",
+            "ai_review_paused": payload.get("reason", "AI job review is temporarily unavailable. Jobster will keep going with its basic review."),
             "application_preflight_started": f"Application preflight for {payload.get('candidates', 0)} pursuit candidates",
             "cycle_completed": f"Research complete · {payload.get('discovered', 0)} relevant jobs",
         }
@@ -110,7 +111,7 @@ class CycleController:
                 self.stage = "discovering"
             elif event == "intake_completed":
                 self.stage = "filtering"
-            elif event in {"evaluation_started", "evaluation_completed"}:
+            elif event in {"evaluation_started", "evaluation_completed", "ai_review_paused"}:
                 self.stage = "evaluating"
             elif event == "application_preflight_started":
                 self.stage = "preparing"
