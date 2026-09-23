@@ -4,60 +4,48 @@
 
 https://www.figma.com/design/2vb3QmMUYo20C5PObeh05p/jobster
 
-Current state observed during planning:
+## Current approved state
 
-Page 1 exists and contains no designed interface yet.
+The v1 personal web interface is now designed in Figma.
+
+Pages:
+
+- 00 Cover
+- 01 Foundations
+- 02 Components
+- 10 Onboarding
+- 20 Dashboard
+
+The approved design includes the complete eight-screen onboarding flow and the desktop Home dashboard.
+
+Detailed screen specification:
+docs/design/FRONTEND_V1.md
 
 ## Rule
 
-Do not build a decorative dashboard before the backend loop needs a human interface.
+The frontend exists to support operational decisions, review, correction, and safe automation.
 
-The frontend exists to support operational decisions.
-
-## First justified UI surfaces
-
-### Today
-
-Shows discovered, rejected, shortlisted, blocked, submitted, recruiter reply, and interview counts.
-
-### Opportunity detail
-
-Shows posting facts separately from CareerBrain reasoning.
-
-### Application queue
-
-Shows ready, blocked, failed, and submitted applications.
-
-### Exceptions
-
-Shows questions Jobster cannot responsibly answer by itself.
-
-### CareerBrain
-
-Shows current profile assumptions, capability confidence, preferences, and pending model update proposals.
-
-### Recruiter and negotiation workspace
-
-Shows thread context, leverage analysis, strategy, and draft responses.
-
-### Settings
-
-Sources, autonomy policy, compensation boundaries, documents, and answer bank.
+It must not become decorative AI theater.
 
 ## UX principles
 
-1. Reasoning must be inspectable.
-2. Fact and inference must be visually separated.
+1. Reasoning outputs must be inspectable without exposing hidden chain-of-thought.
+2. Facts, inferences, unknowns, and blockers should remain visually distinguishable.
 3. Unknowns must be obvious.
-4. Automated actions must have receipts.
-5. High impact actions must expose authority state.
+4. Automated actions must have receipts/history.
+5. High-impact actions must expose authority state.
 6. The interface should optimize review and correction, not decoration.
-7. Avoid generic AI dashboard patterns unless they genuinely fit the task.
+7. State colors are semantic, not ornamental.
+8. Internal provider/model names, prompts, routing formulas, and repository mechanics remain hidden.
+9. User-facing language describes outcomes and actions: preparing context, processing, quality check, needs review.
+10. Figma demo data is illustrative; production UI consumes live Jobster state.
 
 ## Design implementation relationship
 
-Git docs define behavior.
+Git docs define behavior and product truth.
 
-Figma defines approved interface design.
+Figma defines the approved visual and interaction specification.
 
-Frontend code implements the approved design and consumes the same backend services used by CLI and workers.
+Frontend code should implement Figma through reusable UI components while consuming the same Jobster services used by CLI and workers.
+
+The current Figma design does not by itself mean the web frontend code is deployed. Implementation and VPS hosting are separate delivery steps.
