@@ -21,6 +21,13 @@ const state = {
   starStories: [],
   artifacts: [],
   watchRules: [],
+  omniGraph: null,
+  portfolioMap: null,
+  dataHealth: null,
+  learning: null,
+  searchHistory: [],
+  usage: null,
+  integrations: null,
   selectedJob: null,
   selectedOffer: null,
   compareIds: [],
@@ -46,6 +53,8 @@ const routeMeta = {
   interviews: ["INTERVIEW ROOM", "Interviews"],
   offers: ["DECISION DESK", "Offers"],
   insights: ["CAREER INTELLIGENCE", "Insights"],
+  map: ["CAREER CONNECTIONS", "Career Map"],
+  health: ["MODEL HYGIENE", "Data Health"],
   brain: ["CAREER MODEL", "Career Brain"],
   activity: ["HISTORY", "Activity"],
   settings: ["PREFERENCES + AUTHORITY", "Settings"],
@@ -61,6 +70,8 @@ const routeIcons = {
   interviews: "calendar",
   offers: "offer",
   insights: "chart",
+  map: "map",
+  health: "health",
   brain: "brain",
   activity: "activity",
   settings: "settings",
@@ -103,6 +114,9 @@ const activityLabels = {
   star_story_saved: "Interview story saved",
   watch_rule_saved: "Watch rule saved",
   emergency_stop: "Emergency stop used",
+  decision_journal_added: "Decision journal updated",
+  job_archive_updated: "Job archive updated",
+  learning_suggestion_decided: "Learning suggestion reviewed",
 };
 
 const terminalLabels = {
@@ -549,7 +563,7 @@ function renderSourceOptions() {
 
 function filteredJobs() {
   let jobs = state.jobs.filter((job) => {
-    if (job.dismissed && state.filter !== "saved") return false;
+    if ((job.dismissed || job.archived) && state.filter !== "saved") return false;
     if (state.filter === "high_priority" && !["high_priority", "aggressive_pursuit"].includes(job.decision)) return false;
     if (state.filter === "apply" && job.decision !== "apply") return false;
     if (state.filter === "watch" && job.decision !== "watch") return false;
@@ -1168,6 +1182,236 @@ function closeNotificationPanel() {
   $("notification-panel").setAttribute("aria-hidden","true");
 }
 
+
+function renderCareerMap() {
+  const data = state.omniGraph;
+  if (!data || !Array.isArray(data.nodes) || !data.nodes.length) {
+    $("career-map-canvas").innerHTML = '<div class="empty-state">Your career map will appear here.</div>';
+    $("career-map-summary").innerHTML = '<p>No map data yet.</p>';
+    return;
+  }
+
+  const width = 980;
+  const height = 640;
+  const center = { x: width / 2, y: height / 2 };
+  const typeOrder = ["person","target_role","capability","experience","company","job"];
+  const rings = {
+    person: 0,
+    target_role: 110,
+    capability: 210,
+    experience: 285,
+    company: 345,
+    job: 410,
+  };
+
+  const grouped = Object.fromEntries(typeOrder.map((type) => [type, data.nodes.filter((node) => node.type === type)]));
+  const positions = {};
+  for (const type of typeOrder) {
+    const nodes = grouped[type] || [];
+    const radius = rings[type] || 250;
+    nodes.forEach((node, index) => {
+      const offset = type === "company" ? 0.25 : type === "job" ? 0.55 : 0;
+      const angle = nodes.length <= 1 ? -Math.PI / 2 : (-Math.PI / 2 + ((Math.PI * 2) * (index + offset)) / nodes.length);
+      positions[node.id] = type === "person"
+        ? center
+        : { x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius };
+    });
+  }
+
+  const edges = (data.edges || []).map((edge) => {
+    const a = positions[edge.source];
+    const b = positions[edge.target];
+    if (!a || !b) return "";
+    return `<line class="map-edge ${esc(edge.type)}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" />`;
+  }).join("");
+
+  const nodes = data.nodes.map((node) => {
+    const p = positions[node.id] || center;
+    const radius = node.type === "person" ? 30 : node.type === "target_role" ? 17 : 11;
+    const short = String(node.label || "").length > 22 ? String(node.label).slice(0, 20) + "…" : node.label;
+    return `
+      <g class="map-node ${esc(node.type)}" transform="translate(${p.x} ${p.y})">
+        <circle r="${radius}" />
+        <text y="${radius + 15}" text-anchor="middle">${esc(short)}</text>
+      </g>
+    `;
+  }).join("");
+
+  $("career-map-canvas").innerHTML = `
+    <svg class="career-map-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Career relationship map">
+      <g class="map-edges">${edges}</g>
+      <g class="map-nodes">${nodes}</g>
+    </svg>
+  `;
+
+  const summary = data.summary || {};
+  $("career-map-summary").innerHTML = `
+    <div class="map-stat-grid">
+      <div><strong>${summary.target_roles || 0}</strong><span>target roles</span></div>
+      <div><strong>${summary.capabilities || 0}</strong><span>capabilities</span></div>
+      <div><strong>${summary.experiences || 0}</strong><span>career chapters</span></div>
+      <div><strong>${summary.strong_jobs || 0}</strong><span>strong jobs mapped</span></div>
+    </div>
+  `;
+
+  const portfolio = state.portfolioMap || {};
+  const missing = portfolio.missing_proof || [];
+  $("portfolio-proof-summary").innerHTML = missing.length
+    ? `<p><strong>${missing.length}</strong> capabilities are strong enough to matter but do not yet point to portfolio evidence.</p>
+       <div class="mini-list">${missing.slice(0,5).map((item) => `<span>${esc(item.name)}</span>`).join("")}</div>`
+    : '<p>Your mapped capabilities have at least some linked proof.</p>';
+}
+
+function renderDataHealth() {
+  const health = state.dataHealth;
+  if (!health) return;
+  $("health-score").textContent = health.score ?? "—";
+  $("health-score-orb").dataset.status = health.status || "review";
+
+  const issues = health.issues || [];
+  $("data-health-issues").innerHTML = issues.length
+    ? issues.map((item) => `
+      <article class="health-issue ${esc(item.severity)}">
+        <span class="issue-mark"></span>
+        <div><strong>${esc(item.title)}</strong><p>${esc(item.detail)}</p></div>
+        <span class="severity-label">${esc(item.severity)}</span>
+      </article>
+    `).join("")
+    : '<div class="health-clear"><span>✓</span><div><strong>Career data looks healthy.</strong><p>No obvious contradiction or proof problem was found.</p></div></div>';
+
+  const suggestions = state.learning?.suggestions || [];
+  $("learning-suggestions").innerHTML = suggestions.length
+    ? suggestions.map((item) => `
+      <article class="learning-card" data-proposal-id="${esc(item.id)}">
+        <div class="learning-card-copy">
+          <span class="learning-kind">${esc(item.kind.replaceAll("_"," "))}</span>
+          <strong>${esc(item.title)}</strong>
+          <p>${esc(item.detail)}</p>
+          <small>${esc(item.evidence || "")}</small>
+        </div>
+        ${item.requires_approval ? `
+          <div class="learning-actions">
+            <button class="mini-action approve" data-learning-action="approved" data-learning-id="${esc(item.id)}">Keep</button>
+            <button class="mini-action reject" data-learning-action="rejected" data-learning-id="${esc(item.id)}">Dismiss</button>
+          </div>`
+          : '<span class="observation-pill">Observation only</span>'}
+      </article>
+    `).join("")
+    : '<div class="empty-state">No learning suggestions yet.</div>';
+
+  document.querySelectorAll("[data-learning-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        await api(`/api/omni/learning/${encodeURIComponent(button.dataset.learningId)}/decision`, {
+          method: "POST",
+          body: JSON.stringify({ status: button.dataset.learningAction }),
+        });
+        showToast(button.dataset.learningAction === "approved" ? "Suggestion kept for review. Your Career Brain was not silently changed." : "Suggestion dismissed.");
+        state.learning = await api("/api/omni/learning");
+        renderDataHealth();
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
+  });
+
+  const history = state.searchHistory || [];
+  $("search-history").innerHTML = history.length
+    ? history.slice(0,10).map((item) => `
+      <div class="history-row">
+        <span class="history-date">${esc(friendlyTime(item.created_at))}</span>
+        <span><strong>${item.relevant ?? 0}</strong> suitable</span>
+        <span><strong>${item.rejected ?? 0}</strong> hidden</span>
+        <span class="${item.ai_review_paused ? "history-warning" : ""}">${item.ai_review_paused ? "basic review used" : "advanced review available"}</span>
+      </div>
+    `).join("")
+    : '<div class="empty-state">No completed search history yet.</div>';
+
+  const usage = state.usage || {};
+  const search = usage.search || {};
+  $("usage-center").innerHTML = `
+    <div class="usage-meter">
+      <div class="usage-meter-head"><span>Web searches today</span><strong>${search.used_today ?? 0}/${search.daily_limit ?? 0}</strong></div>
+      <div class="usage-track"><i style="width:${search.daily_limit ? Math.min(100,(search.used_today/search.daily_limit)*100) : 0}%"></i></div>
+    </div>
+    <div class="usage-meter">
+      <div class="usage-meter-head"><span>Protected 30-day search budget</span><strong>${search.used ?? 0}/${search.usable_limit ?? 0}</strong></div>
+      <div class="usage-track"><i style="width:${search.usable_limit ? Math.min(100,(search.used/search.usable_limit)*100) : 0}%"></i></div>
+    </div>
+    <p class="sheet-note">${esc(usage.advanced_review?.detail || "")}</p>
+  `;
+
+  const integrations = state.integrations || {};
+  $("integration-status").innerHTML = Object.entries(integrations).map(([name,item]) => `
+    <div class="integration-row">
+      <span class="integration-icon">${icon(name === "email" ? "mail" : name === "calendar" ? "calendar" : "message")}</span>
+      <span><strong>${esc(name.replaceAll("_"," "))}</strong><small>${esc(item.detail)}</small></span>
+      <span class="connection-pill ${item.connected ? "connected" : ""}">${item.connected ? "Connected" : item.status === "not_implemented" ? "Not connected" : "Connection needed"}</span>
+    </div>
+  `).join("");
+
+  const portfolio = state.portfolioMap || {};
+  const capabilities = portfolio.capabilities || [];
+  $("portfolio-map").innerHTML = capabilities.length
+    ? `<div class="proof-bars">${capabilities.slice(0,14).map((item) => {
+        const width = item.proof === "strong" ? 100 : item.proof === "some" ? 62 : 20;
+        return `<div class="proof-row"><span>${esc(item.name)}</span><div><i class="${esc(item.proof)}" style="width:${width}%"></i></div><small>${esc(item.proof)}</small></div>`;
+      }).join("")}</div>`
+    : '<div class="empty-state">No capability proof data is available yet.</div>';
+}
+
+async function renderJobExplanation(jobId) {
+  if (!jobId) return;
+  try {
+    const [explanation, brief, journal] = await Promise.all([
+      api(`/api/jobs/${encodeURIComponent(jobId)}/explain`),
+      api(`/api/jobs/${encodeURIComponent(jobId)}/decision-brief`),
+      api(`/api/jobs/${encodeURIComponent(jobId)}/journal?limit=50`),
+    ]);
+    state.selectedJob.explanation = explanation;
+    state.selectedJob.brief = brief;
+    state.selectedJob.journal = journal;
+
+    const why = brief.why || [];
+    const risks = brief.risks || [];
+    const blockers = brief.auto_action_blockers || [];
+    $("drawer-decision-brief").innerHTML = `
+      <div class="brief-head"><strong>${esc(brief.headline)}</strong><span>${esc(brief.confidence)} confidence</span></div>
+      <div class="brief-columns">
+        <div><small>WHY IT STAYS</small>${why.length ? why.map((item) => `<p>• ${esc(item)}</p>`).join("") : "<p>No strong reason recorded yet.</p>"}</div>
+        <div><small>RISKS</small>${risks.length ? risks.map((item) => `<p>• ${esc(item)}</p>`).join("") : "<p>No major risk recorded.</p>"}</div>
+      </div>
+      ${blockers.length ? `<div class="brief-blocker"><small>WHY JOBSTER IS NOT ACTING AUTOMATICALLY</small>${blockers.map((item) => `<p>• ${esc(item)}</p>`).join("")}</div>` : ""}
+    `;
+
+    const evidence = explanation.evidence || [];
+    $("drawer-evidence-trace").innerHTML = evidence.length
+      ? evidence.map((item) => `
+        <div class="evidence-trace-row">
+          <span class="evidence-dot"></span>
+          <span><strong>${esc(item.statement)}</strong><small>${esc(item.source || "Unknown source")}</small></span>
+          <span class="evidence-status ${esc(item.status || "")}">${esc(item.status || "active")}</span>
+        </div>
+      `).join("")
+      : '<div class="empty-state small-empty">This review did not point to specific evidence records.</div>';
+
+    renderDecisionJournal(journal);
+  } catch (error) {
+    $("drawer-decision-brief").innerHTML = `<p>${esc(error.message)}</p>`;
+  }
+}
+
+function renderDecisionJournal(entries) {
+  $("decision-journal-list").innerHTML = (entries || []).length
+    ? entries.map((item) => `
+      <div class="journal-entry">
+        <span class="journal-decision">${esc(item.decision)}</span>
+        <span><strong>${esc(item.reason || "No reason added")}</strong><small>${esc(friendlyTime(item.created_at))}${item.note ? " · " + esc(item.note) : ""}</small></span>
+      </div>
+    `).join("")
+    : '<div class="empty-state small-empty">No decision notes yet.</div>';
+}
+
 function renderAll() {
   renderStatus();
   renderMissions();
@@ -1180,6 +1424,8 @@ function renderAll() {
   renderInterviews();
   renderOffers();
   renderInsights();
+  renderCareerMap();
+  renderDataHealth();
   renderActivity();
   renderReadiness();
   renderGoals();
@@ -1199,6 +1445,7 @@ async function loadAll({ quiet = false } = {}) {
       status, jobs, applications, activity, attention, readiness, settings,
       missions, insights, evidence, companies, contacts, interviews, offers,
       authority, notifications, goals, feedback, outreach, starStories, artifacts, watchRules,
+      omniGraph, portfolioMap, dataHealth, learning, searchHistory, usage, integrations,
     ] = await Promise.all([
       api("/api/status"),
       api("/api/jobs?limit=300"),
@@ -1222,11 +1469,19 @@ async function loadAll({ quiet = false } = {}) {
       api("/api/star-stories?limit=200"),
       api("/api/artifacts?limit=300"),
       api("/api/watch-rules?limit=100"),
+      api("/api/omni/graph"),
+      api("/api/omni/portfolio"),
+      api("/api/omni/data-health"),
+      api("/api/omni/learning"),
+      api("/api/search-history?limit=30"),
+      api("/api/system/usage"),
+      api("/api/integrations"),
     ]);
     Object.assign(state, {
       status, jobs, applications, activity, attention, readiness, settings,
       missions, insights, evidence, companies, contacts, interviews, offers,
       authority, notifications, goals, feedback, outreach, starStories, artifacts, watchRules,
+      omniGraph, portfolioMap, dataHealth, learning, searchHistory, usage, integrations,
     });
     renderAll();
   } catch (error) {
@@ -1268,6 +1523,7 @@ function renderDrawerPreference() {
   $("drawer-save").title = pref.saved ? "Remove saved job" : "Save job";
   $("drawer-note-input").value = pref.note || "";
   $("dismiss-job-btn").textContent = pref.dismissed ? "Show this job again" : "Hide this job";
+  $("archive-job-btn").innerHTML = `${icon("archive")} ${pref.archived ? "Restore from archive" : "Archive"}`;
 }
 
 function renderVerification(verification) {
@@ -1333,6 +1589,7 @@ async function openJob(jobId) {
 
     renderVerification(verification);
     renderDrawerPreference();
+    renderJobExplanation(job.id);
 
     $("open-job-btn").disabled = !job.url;
     $("verify-job-btn").disabled = !job.url;
@@ -1759,11 +2016,17 @@ function setupPreferences() {
   const reduceMotion = localStorage.getItem("jobster-pref-motion") === "1";
   const compact = localStorage.getItem("jobster-pref-compact") === "1";
   const terminalDefault = localStorage.getItem("jobster-pref-terminal") !== "0";
+  const theme = localStorage.getItem("jobster-pref-theme") || "editorial";
+  const density = localStorage.getItem("jobster-pref-density") || "comfortable";
   $("pref-motion").checked = reduceMotion;
   $("pref-compact").checked = compact;
   $("pref-terminal").checked = terminalDefault;
+  $("pref-theme").value = theme;
+  $("pref-density").value = density;
   document.body.classList.toggle("reduce-motion",reduceMotion);
   document.body.classList.toggle("compact-list-mode",compact);
+  document.body.dataset.theme = theme;
+  document.body.dataset.density = density;
   $("pref-motion").addEventListener("change",(event) => {
     localStorage.setItem("jobster-pref-motion",event.target.checked ? "1":"0");
     document.body.classList.toggle("reduce-motion",event.target.checked);
@@ -1774,6 +2037,14 @@ function setupPreferences() {
   });
   $("pref-terminal").addEventListener("change",(event) => {
     localStorage.setItem("jobster-pref-terminal",event.target.checked ? "1":"0");
+  });
+  $("pref-theme").addEventListener("change",(event) => {
+    localStorage.setItem("jobster-pref-theme",event.target.value);
+    document.body.dataset.theme = event.target.value;
+  });
+  $("pref-density").addEventListener("change",(event) => {
+    localStorage.setItem("jobster-pref-density",event.target.value);
+    document.body.dataset.density = event.target.value;
   });
 }
 
@@ -1840,6 +2111,52 @@ $("save-note-btn").addEventListener("click",async () => {
   const id = state.selectedJob?.job?.id;
   if (id) await setJobPreference(id,{note:$("drawer-note-input").value});
 });
+
+$("explain-job-btn").addEventListener("click",() => {
+  const id = state.selectedJob?.job?.id;
+  if (id) renderJobExplanation(id);
+});
+$("save-journal-btn").addEventListener("click",async () => {
+  const id = state.selectedJob?.job?.id;
+  if (!id) return;
+  const decision = $("journal-decision").value;
+  const reason = $("journal-reason").value.trim();
+  if (!reason) return showToast("Add a short reason for this decision.");
+  try {
+    await api(`/api/jobs/${encodeURIComponent(id)}/journal`, {
+      method: "POST",
+      body: JSON.stringify({ decision, reason }),
+    });
+    $("journal-reason").value = "";
+    const journal = await api(`/api/jobs/${encodeURIComponent(id)}/journal?limit=50`);
+    state.selectedJob.journal = journal;
+    renderDecisionJournal(journal);
+    showToast("Decision journal updated.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+$("archive-job-btn").addEventListener("click",async () => {
+  const id = state.selectedJob?.job?.id;
+  if (!id) return;
+  const archived = Boolean(state.selectedJob?.preference?.archived);
+  try {
+    const result = await api(`/api/jobs/${encodeURIComponent(id)}/archive`, {
+      method: "POST",
+      body: JSON.stringify({ archived: !archived }),
+    });
+    state.selectedJob.preference.archived = result.archived;
+    const job = state.jobs.find((item) => item.id === id);
+    if (job) job.archived = result.archived;
+    renderDrawerPreference();
+    renderJobs();
+    showToast(result.archived ? "Job archived." : "Job restored.");
+    if (result.archived) closeDrawer();
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
 $("dismiss-job-btn").addEventListener("click",async () => {
   const id = state.selectedJob?.job?.id;
   if (!id) return;
