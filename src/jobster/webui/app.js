@@ -582,6 +582,8 @@ function jobCard(job, index = 0) {
     job.location || (job.remote ? "Remote" : null),
     salary,
     job.source,
+    job.updated_at ? `Seen ${friendlyTime(job.updated_at)}` : null,
+    Number.isFinite(job.confidence) ? `${Math.round(job.confidence * 100)}% confidence` : null,
   ].filter(Boolean);
   const verification = job.verification_state
     ? `<span class="verification-badge" data-state="${esc(job.verification_state)}">${esc(friendlyVerification(job.verification_state))}</span>`
@@ -1286,6 +1288,31 @@ async function openJob(jobId) {
     $("drawer-decision").dataset.tone = decisionTone(evaluation?.pursuit_decision);
     $("drawer-summary").textContent = evaluation?.summary || evaluation?.role_interpretation || "Jobster has not reviewed this job yet.";
     $("drawer-next").textContent = evaluation?.next_action || "Review this job first.";
+    $("drawer-confidence").textContent = Number.isFinite(evaluation?.confidence)
+      ? `${Math.round(evaluation.confidence * 100)}%`
+      : "Unknown";
+
+    const requirements = evaluation?.requirement_assessments || [];
+    $("drawer-requirements").innerHTML = requirements.length
+      ? requirements.slice(0,8).map((item) => `
+        <div class="requirement-row">
+          <span><strong>${esc(item.requirement)}</strong><small>${esc(item.reason || "")}</small></span>
+          <span class="fit-pill ${esc(item.fit)}">${esc(String(item.fit || "").replaceAll("_"," "))}</span>
+        </div>
+      `).join("")
+      : '<div class="empty-state small-empty">Detailed requirement mapping is not available for this review.</div>';
+
+    const careerValue = evaluation?.career_value || {};
+    const valueOrder = [
+      ["compensation","Pay"],
+      ["growth","Growth"],
+      ["interesting_work","Interest"],
+      ["global_exposure","Global"],
+      ["future_positioning","Future"],
+    ];
+    $("drawer-career-value").innerHTML = valueOrder.map(([key,label]) => `
+      <div class="career-value-item ${esc(careerValue[key] || "unknown")}"><strong>${esc(label)}</strong><span>${esc(careerValue[key] || "unknown")}</span></div>
+    `).join("");
 
     const matches = evaluation?.strong_matches || [];
     $("drawer-matches").innerHTML = matches.length
