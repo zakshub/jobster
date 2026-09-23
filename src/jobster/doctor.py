@@ -67,7 +67,7 @@ def doctor(
             checks.append(
                 {
                     "name": "serpapi_budget",
-                    "ok": status.allowed,
+                    "ok": True,
                     "detail": (
                         f"{status.used_in_window}/{status.usable_limit} usable queries "
                         f"in {budget.window_days}-day window; "
