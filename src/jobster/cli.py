@@ -49,5 +49,15 @@ def evaluate(
     console.print("Next: " + result.next_action)
 
 
+@app.command("init-db")
+def init_db(db: Path = typer.Option(Path("data/jobster.db"))):
+    """Initialize local Jobster SQLite state."""
+    from .storage import JobsterStore
+
+    store = JobsterStore(db)
+    store.init()
+    console.print(f"Initialized {db}")
+
+
 if __name__ == "__main__":
     app()

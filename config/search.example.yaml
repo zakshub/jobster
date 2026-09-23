@@ -1,0 +1,13 @@
+cycle_minutes: 60
+
+sources:
+  remoteok:
+    enabled: true
+  remotive:
+    enabled: true
+  weworkremotely:
+    enabled: true
+  google_jobs:
+    enabled: false
+    query: remote senior product designer OR ux architect OR product designer
+    location: Pakistan

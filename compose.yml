@@ -1,0 +1,10 @@
+services:
+  jobster:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./config:/app/config:ro
+      - ./data:/app/data
+      - ./private_data:/app/private_data
