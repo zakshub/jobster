@@ -18,10 +18,10 @@
       </div>
 
       <nav class="nav" aria-label="Primary">
-        <button class="nav-item is-active" data-route="overview">Overview</button>
-        <button class="nav-item" data-route="opportunities">Opportunities</button>
-        <button class="nav-item" data-route="applications">Applications</button>
-        <button class="nav-item" data-route="activity">Activity</button>
+        <button class="nav-item is-active" data-route="overview"><span>Overview</span></button>
+        <button class="nav-item" data-route="opportunities"><span>Opportunities</span></button>
+        <button class="nav-item" data-route="applications"><span>Applications</span></button>
+        <button class="nav-item" data-route="activity"><span>Activity</span></button>
       </nav>
 
       <div class="sidebar-bottom">
@@ -37,12 +37,18 @@
       <header class="topbar">
         <div>
           <div class="eyebrow" id="page-eyebrow">CAREER COMMAND CENTER</div>
-          <h1 id="page-title">Overview</h1>
+          <div class="title-row">
+            <h1 id="page-title">Overview</h1>
+            <span class="stage-pill" id="stage-pill">Idle</span>
+          </div>
         </div>
         <div class="topbar-actions">
           <div class="quota-mini" id="quota-mini">Search budget · —</div>
           <button class="button button-secondary" id="refresh-btn">Refresh</button>
-          <button class="button button-primary" id="run-cycle-btn">Run search cycle</button>
+          <button class="button button-primary" id="run-cycle-btn">
+            <span class="button-dot"></span>
+            Research opportunities
+          </button>
         </div>
       </header>
 
@@ -51,7 +57,7 @@
           <div>
             <div class="eyebrow">PRIVATE CAREER OPERATIONS</div>
             <h2>Your career, continuously represented.</h2>
-            <p>Discover opportunities, understand fit, prepare truthful applications, track outcomes and keep consequential decisions visible.</p>
+            <p>Targeted discovery, fit intelligence, source verification and application preparation — with noisy roles filtered before they consume attention or AI budget.</p>
           </div>
           <div class="hero-meta">
             <div class="hero-meta-label">Current profile</div>
@@ -60,16 +66,21 @@
           </div>
         </div>
 
-        <div class="metric-grid">
+        <div class="metric-grid metric-grid-five">
           <article class="metric-card">
-            <div class="metric-label">Opportunities</div>
+            <div class="metric-label">Relevant opportunities</div>
             <div class="metric-value" id="metric-jobs">0</div>
-            <div class="metric-foot">discovered</div>
+            <div class="metric-foot">inside your career lanes</div>
           </article>
           <article class="metric-card">
             <div class="metric-label">High priority</div>
             <div class="metric-value" id="metric-high">0</div>
             <div class="metric-foot">worth active pursuit</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-label">Noise blocked</div>
+            <div class="metric-value" id="metric-hidden">0</div>
+            <div class="metric-foot">irrelevant roles hidden</div>
           </article>
           <article class="metric-card">
             <div class="metric-label">Applications</div>
@@ -79,7 +90,7 @@
           <article class="metric-card">
             <div class="metric-label">Submitted</div>
             <div class="metric-value" id="metric-submitted">0</div>
-            <div class="metric-foot">confirmed</div>
+            <div class="metric-foot">confirmed only</div>
           </article>
         </div>
 
@@ -93,7 +104,7 @@
               <button class="text-button" data-route-jump="opportunities">View all</button>
             </div>
             <div class="job-list compact" id="priority-list">
-              <div class="empty-state">No evaluated opportunities yet.</div>
+              <div class="empty-state">No high-priority opportunities yet.</div>
             </div>
           </section>
 
@@ -105,28 +116,56 @@
               </div>
             </div>
             <div class="status-list">
-              <div class="status-row"><span>Search cycle</span><strong id="cycle-status">Idle</strong></div>
-              <div class="status-row"><span>Final submission</span><strong id="submission-status">Off</strong></div>
+              <div class="status-row"><span>Research cycle</span><strong id="cycle-status">Idle</strong></div>
+              <div class="status-row"><span>Strict relevance gate</span><strong id="intake-status">On</strong></div>
+              <div class="status-row"><span>Final submission</span><strong id="submission-status">Supervised</strong></div>
               <div class="status-row"><span>Submission window</span><strong id="window-status">—</strong></div>
               <div class="status-row"><span>Search usage</span><strong id="quota-status">—</strong></div>
             </div>
           </section>
         </div>
+
+        <section class="panel source-panel">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">SOURCE DIVERSITY</div>
+              <h3>Where relevant jobs are coming from</h3>
+            </div>
+            <div class="panel-note">Only roles that pass intake are counted here.</div>
+          </div>
+          <div class="source-mix" id="source-mix">
+            <div class="empty-state">No relevant source data yet.</div>
+          </div>
+        </section>
       </section>
 
       <section class="view" id="view-opportunities">
+        <div class="intelligence-strip">
+          <div>
+            <div class="eyebrow">STRICT INTAKE</div>
+            <strong>Only target and adjacent design roles are shown.</strong>
+          </div>
+          <div class="intelligence-copy" id="intake-copy">Filtering non-design, sales, HR, generic engineering and course/content roles before CareerBrain evaluation.</div>
+        </div>
+
         <div class="toolbar">
           <div class="filter-group" role="group" aria-label="Opportunity filter">
-            <button class="chip is-active" data-filter="all">All</button>
+            <button class="chip is-active" data-filter="all">All relevant</button>
             <button class="chip" data-filter="aggressive_pursuit">Aggressive</button>
             <button class="chip" data-filter="high_priority">High priority</button>
             <button class="chip" data-filter="apply">Apply</button>
             <button class="chip" data-filter="watch">Watch</button>
           </div>
-          <input class="search-input" id="job-search" type="search" placeholder="Search company or role" />
+          <div class="toolbar-right">
+            <select class="source-select" id="source-filter" aria-label="Filter by source">
+              <option value="all">All sources</option>
+            </select>
+            <input class="search-input" id="job-search" type="search" placeholder="Search company or role" />
+          </div>
         </div>
+
         <div class="job-list" id="jobs-list">
-          <div class="empty-state">No jobs loaded.</div>
+          <div class="empty-state">No relevant jobs loaded.</div>
         </div>
       </section>
 
@@ -134,8 +173,8 @@
         <div class="application-summary">
           <div>
             <div class="eyebrow">APPLICATION CONTROL</div>
-            <h2>Human authority stays visible.</h2>
-            <p>Prepared, blocked and submitted states are shown separately. Sensitive or unknown answers stop automation instead of being guessed.</p>
+            <h2>Automation without silent decisions.</h2>
+            <p>Jobster can prepare and inspect supported ATS applications. Sensitive answers, uncertain facts, expired listings and unsupported application flows stop automation instead of being guessed.</p>
           </div>
           <div class="mode-card">
             <div class="mode-label">Current mode</div>
@@ -179,7 +218,10 @@
           <div class="metric-label">Interest</div>
           <div class="drawer-score-value" id="drawer-score">—</div>
         </div>
-        <div class="decision-badge" id="drawer-decision">—</div>
+        <div class="drawer-badges">
+          <div class="verification-badge" id="drawer-verification" data-state="unknown">Not verified</div>
+          <div class="decision-badge" id="drawer-decision">—</div>
+        </div>
       </div>
       <section class="detail-section">
         <div class="detail-label">Assessment</div>
@@ -197,13 +239,37 @@
         <div class="detail-label">Next action</div>
         <p id="drawer-next">—</p>
       </section>
+      <section class="detail-section verification-detail">
+        <div class="detail-label">Source verification</div>
+        <p id="verification-detail">Verify the source before application preparation.</p>
+      </section>
       <div class="drawer-actions">
-        <button class="button button-secondary" id="open-job-btn">Open job</button>
+        <button class="button button-secondary" id="verify-job-btn">Verify live</button>
+        <button class="button button-secondary" id="open-job-btn">Open source</button>
         <button class="button button-primary" id="prepare-job-btn">Prepare application</button>
       </div>
       <div class="drawer-note" id="drawer-note"></div>
     </div>
   </aside>
+
+  <section class="terminal-window" id="terminal-window" aria-label="Live research terminal">
+    <header class="terminal-header" id="terminal-handle">
+      <div class="terminal-title">
+        <span class="terminal-led"></span>
+        <span>LIVE RESEARCH TERMINAL</span>
+        <span class="terminal-stage" id="terminal-stage">idle</span>
+      </div>
+      <div class="terminal-controls">
+        <button id="terminal-minimize" aria-label="Minimize terminal">—</button>
+        <button id="terminal-close" aria-label="Close terminal">×</button>
+      </div>
+    </header>
+    <div class="terminal-progress"><span id="terminal-progress-bar"></span></div>
+    <div class="terminal-body" id="terminal-body">
+      <div class="terminal-line muted">Jobster terminal ready. Start a research cycle to see live operations.</div>
+    </div>
+  </section>
+  <button class="terminal-reopen" id="terminal-reopen">Open live terminal</button>
 
   <div class="toast" id="toast"></div>
   <script src="/assets/app.js" defer></script>

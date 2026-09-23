@@ -1,5 +1,14 @@
 cycle_minutes: 60
 
+# Strict career-lane intake. Jobs outside the configured target/adjacent design
+# titles are rejected before semantic CareerBrain evaluation.
+intake:
+  enabled: true
+  min_title_score: 70
+  max_per_source: 12
+  max_total: 60
+
+
 # Hard guard for a 250-query SerpAPI plan.
 # Jobster keeps 25 queries in reserve and will use at most 7 per day,
 # so it cannot burn the full plan before a 30-day window completes.

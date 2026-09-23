@@ -5,6 +5,7 @@ import html
 import httpx
 
 from jobster.models import Job
+from jobster.text_utils import repair_text
 from .base import JobSource
 
 
@@ -17,12 +18,12 @@ def parse_remoteok(payload: list[dict]) -> list[Job]:
         if not isinstance(item, dict) or not item.get("id") or not item.get("position"):
             continue
         description = html.unescape(str(item.get("description") or ""))
-        location = str(item.get("location") or "Remote")
+        location = repair_text(item.get("location") or "Remote")
         jobs.append(
             Job(
                 id=f"remoteok:{item['id']}",
-                title=str(item.get("position") or ""),
-                company=str(item.get("company") or "Unknown company"),
+                title=repair_text(item.get("position") or ""),
+                company=repair_text(item.get("company") or "Unknown company"),
                 description=description,
                 location=location,
                 remote=True,

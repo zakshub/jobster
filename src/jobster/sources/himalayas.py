@@ -7,6 +7,7 @@ import time
 import httpx
 
 from jobster.models import Job
+from jobster.text_utils import repair_text
 from .base import JobSource
 
 
@@ -56,8 +57,8 @@ def parse_himalayas(payload: dict) -> list[Job]:
         jobs.append(
             Job(
                 id=f"himalayas:{guid}",
-                title=str(item.get("title") or ""),
-                company=str(item.get("companyName") or "Unknown company"),
+                title=repair_text(item.get("title") or ""),
+                company=repair_text(item.get("companyName") or "Unknown company"),
                 description=description,
                 location=location,
                 remote=True,

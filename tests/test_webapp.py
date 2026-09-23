@@ -124,6 +124,18 @@ def seed(db_path: Path):
             reasons=["Final submission is disabled by policy"],
         )
     )
+    store.save_job(
+        Job(
+            id="job-noise",
+            title="Payroll Assistant",
+            company="Noise Co",
+            description="Payroll operations",
+            location="Remote",
+            remote=True,
+            source="remoteok",
+            url="https://example.com/noise",
+        )
+    )
 
 
 def test_web_console_status_and_jobs(tmp_path, monkeypatch):
@@ -141,11 +153,13 @@ def test_web_console_status_and_jobs(tmp_path, monkeypatch):
     payload = status.json()
     assert payload["profile"]["display_name"] == "Zak"
     assert payload["metrics"]["jobs"] == 1
+    assert payload["metrics"]["hidden_irrelevant"] == 1
     assert payload["metrics"]["high_priority"] == 1
     assert payload["submission"]["auto_submit"] is False
 
     jobs = client.get("/api/jobs")
     assert jobs.status_code == 200
+    assert len(jobs.json()) == 1
     assert jobs.json()[0]["interest_score"] == 94
     assert jobs.json()[0]["decision"] == "high_priority"
 

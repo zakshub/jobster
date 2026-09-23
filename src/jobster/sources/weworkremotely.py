@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 import httpx
 
 from jobster.models import Job
+from jobster.text_utils import repair_text
 from .base import JobSource
 
 
@@ -20,7 +21,7 @@ def parse_wwr(xml_text: str) -> list[Job]:
     root = ET.fromstring(xml_text)
     jobs: list[Job] = []
     for item in root.findall("./channel/item"):
-        title = item.findtext("title") or ""
+        title = repair_text(item.findtext("title") or "")
         link = item.findtext("link") or ""
         guid = item.findtext("guid") or link or title
         description = _clean_html(item.findtext("description") or "")

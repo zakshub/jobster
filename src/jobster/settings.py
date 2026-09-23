@@ -46,6 +46,13 @@ class WebSearchConfig(SourceToggle):
     cache_hours: float = Field(default=24, ge=1, le=168)
 
 
+class IntakeConfig(BaseModel):
+    enabled: bool = True
+    min_title_score: int = Field(default=70, ge=0, le=100)
+    max_per_source: int = Field(default=12, ge=1, le=100)
+    max_total: int = Field(default=60, ge=1, le=500)
+
+
 class SerpApiBudgetConfig(BaseModel):
     monthly_limit: int = Field(default=250, ge=1)
     reserve_queries: int = Field(default=25, ge=0)
@@ -86,6 +93,7 @@ class ApplicationConfig(BaseModel):
 
 class SearchConfig(BaseModel):
     cycle_minutes: int = Field(default=60, ge=15)
+    intake: IntakeConfig = Field(default_factory=IntakeConfig)
     serpapi_budget: SerpApiBudgetConfig = Field(default_factory=SerpApiBudgetConfig)
     sources: SourcesConfig = Field(default_factory=SourcesConfig)
     application: ApplicationConfig = Field(default_factory=ApplicationConfig)
