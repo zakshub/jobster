@@ -185,3 +185,20 @@ class WorkdayExecutor(BrowserFormExecutor):
 
     def execute(self, job: Job, plan: ApplicationPlan) -> dict:
         raise BrowserExecutionError("Workday execution is inspection only until a dedicated flow is validated")
+
+
+class GenericCareersExecutor(BrowserFormExecutor):
+    """Inspect and prepare ordinary company career forms conservatively.
+
+    Generic company forms vary too much for unattended final submission.
+    Jobster may inspect and prepare them, but the final submit action stays
+    human-controlled until a site-specific flow has been validated.
+    """
+
+    ats_name = "generic_careers"
+    capability = ExecutorCapability("generic_careers", True, True, True, False)
+
+    def execute(self, job: Job, plan: ApplicationPlan) -> dict:
+        raise BrowserExecutionError(
+            "This company career form can be prepared, but final submission still needs a human check"
+        )
