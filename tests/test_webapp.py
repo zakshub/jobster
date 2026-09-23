@@ -175,3 +175,66 @@ def test_web_console_job_detail(tmp_path, monkeypatch):
     assert payload["job"]["company"] == "Acme Health"
     assert payload["evaluation"]["pursuit_decision"] == "high_priority"
     assert payload["application"]["state"] == "preparing"
+
+
+def test_enterprise_endpoints_and_saved_job(tmp_path, monkeypatch):
+    db_path = configure_runtime(tmp_path, monkeypatch)
+    seed(db_path)
+
+    client = TestClient(app)
+
+    saved = client.post(
+        "/api/jobs/job-1/preference",
+        json={"saved": True, "note": "Strong healthcare fit"},
+    )
+    assert saved.status_code == 200
+    assert saved.json()["saved"] is True
+    assert saved.json()["note"] == "Strong healthcare fit"
+
+    jobs = client.get("/api/jobs")
+    assert jobs.status_code == 200
+    assert jobs.json()[0]["saved"] is True
+    assert jobs.json()[0]["note"] == "Strong healthcare fit"
+
+    detail = client.get("/api/jobs/job-1")
+    assert detail.status_code == 200
+    assert detail.json()["preference"]["saved"] is True
+
+    readiness = client.get("/api/readiness")
+    assert readiness.status_code == 200
+    assert readiness.json()["total"] >= 4
+    assert "application_sites" in readiness.json()
+
+    settings = client.get("/api/settings")
+    assert settings.status_code == 200
+    assert settings.json()["job_search"]["target_titles"] == ["Senior Product Designer"]
+    assert settings.json()["applications"]["auto_apply"] is False
+
+    pipeline = client.get("/api/pipeline")
+    assert pipeline.status_code == 200
+    assert pipeline.json()["preparing"] == 1
+
+
+def test_attention_queue_lists_blocked_application(tmp_path, monkeypatch):
+    db_path = configure_runtime(tmp_path, monkeypatch)
+    seed(db_path)
+    store = JobsterStore(db_path)
+    store.save_application_plan(
+        ApplicationPlan(
+            job_id="job-1",
+            ats="greenhouse",
+            state=ApplicationState.BLOCKED,
+            reasons=["Required question has no approved answer: Notice period"],
+        )
+    )
+
+    client = TestClient(app)
+    response = client.get("/api/attention")
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["job_id"] == "job-1"
+    assert "Notice period" in payload[0]["reasons"][0]
+
+    status = client.get("/api/status").json()
+    assert status["metrics"]["needs_you"] == 1
