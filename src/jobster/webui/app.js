@@ -825,14 +825,14 @@ async function reviewOffer(offerId) {
       method: "POST",
       body: JSON.stringify({}),
     });
-    $("offer-advice-result").innerHTML = `
+    document.getElementById("offer-advice-result").innerHTML = `
       <div class="negotiation-line"><span>Leverage</span><strong>${esc((advice.leverage || "unknown").replaceAll("_"," "))}</strong></div>
       <div class="negotiation-line"><span>Suggested counter</span><strong>${esc(advice.recommended_counter_monthly ? money(advice.recommended_counter_monthly, offer.currency) : "Ask for the approved range first")}</strong></div>
       <div class="negotiation-line"><span>Walk-away line</span><strong>${esc(advice.walk_away_below_monthly ? money(advice.walk_away_below_monthly, offer.currency) : "Not set")}</strong></div>
       <div class="negotiation-line"><span>Strategy</span><strong>${esc((advice.strategy || []).join(" "))}</strong></div>
     `;
   } catch (error) {
-    $("offer-advice-result").innerHTML = `<div class="negotiation-line"><span>Problem</span><strong>${esc(error.message)}</strong></div>`;
+    document.getElementById("offer-advice-result").innerHTML = `<div class="negotiation-line"><span>Problem</span><strong>${esc(error.message)}</strong></div>`;
   }
 }
 
