@@ -344,3 +344,53 @@ def test_pwa_files_are_served(tmp_path, monkeypatch):
     assert manifest.status_code == 200
     service_worker = client.get("/service-worker.js")
     assert service_worker.status_code == 200
+
+
+def test_extended_career_workflow_endpoints(tmp_path, monkeypatch):
+    db_path = configure_runtime(tmp_path, monkeypatch)
+    seed(db_path)
+    client = TestClient(app)
+
+    outreach = client.post(
+        "/api/outreach",
+        json={"body": "Hello, I am interested in the role.", "subject": "Senior Product Designer"},
+    )
+    assert outreach.status_code == 200
+    assert len(client.get("/api/outreach").json()) == 1
+
+    story = client.post(
+        "/api/star-stories",
+        json={
+            "title": "Reworked a complex healthcare workflow",
+            "situation": "Clinicians struggled with a dense workflow.",
+            "action": "Redesigned the information architecture.",
+            "result": "Reduced friction in the workflow.",
+            "skills": "Healthcare UX, Information Architecture",
+        },
+    )
+    assert story.status_code == 200
+    assert client.get("/api/star-stories").json()[0]["skills"] == [
+        "Healthcare UX",
+        "Information Architecture",
+    ]
+
+    rule = client.post(
+        "/api/watch-rules",
+        json={
+            "label": "Senior product design over target",
+            "criteria": {"title_contains": "Product Designer", "minimum_monthly": 6500},
+        },
+    )
+    assert rule.status_code == 200
+    assert client.get("/api/watch-rules").json()[0]["enabled"] is True
+
+    store = JobsterStore(db_path)
+    store.save_application_artifact("job-1", "resume", "artifacts/job-1.md", "Tailored resume")
+    artifacts = client.get("/api/artifacts")
+    assert artifacts.status_code == 200
+    assert artifacts.json()[0]["artifact_type"] == "resume"
+
+    stopped = client.post("/api/emergency-stop")
+    assert stopped.status_code == 200
+    authority = client.get("/api/authority").json()
+    assert all(not authority[key]["enabled"] for key in ("search", "prepare", "submit", "contact", "follow_up"))
