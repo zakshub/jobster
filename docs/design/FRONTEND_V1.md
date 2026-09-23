@@ -5,107 +5,59 @@
 Figma:
 https://www.figma.com/design/2vb3QmMUYo20C5PObeh05p/jobster
 
-The approved v1 interface is designed for a 1440px desktop web app deployed on the personal VPS.
+The approved personal interface is designed for a 1440px desktop web app deployed on the personal VPS.
 
-## Design direction
-
-Jobster is a career command center, not a generic AI dashboard.
-
-The design uses:
-
-- off-white operational workspace
-- deep ink navigation
-- one controlled electric-blue action color
-- semantic green, amber, and red only when state meaning exists
-- Inter typography
-- thin borders and restrained elevation
-- dense but calm operational layouts
-- evidence, state, warnings, approvals, outputs, and next actions as the visible product language
-
-The frontend must not expose internal provider/model names, prompts, hidden chain-of-thought, routing weights, scoring formulas, repository internals, or private learning mechanics.
-
-## Figma page map
+## Canonical Figma pages
 
 - 00 Cover
 - 01 Foundations
 - 02 Components
-- 10 Onboarding
-- 20 Dashboard
+- 10 Onboarding — legacy/reference
+- 11 Onboarding V2 — **canonical onboarding**
+- 20 Dashboard — **canonical Home dashboard**
 
-## Onboarding
+Detailed onboarding specification:
+docs/design/ONBOARDING_V2.md
 
-Eight desktop screens are approved:
+## Product design split
 
-1. Welcome
-2. Profile & Evidence
-3. Career Direction
-4. Preferences & Boundaries
-5. Application Authority
-6. Connections & Sources
-7. Review & Activate
-8. Ready
+Onboarding and the daily command center intentionally use different visual intensity.
 
-### Welcome
+### Onboarding
 
-Explains the product promise and three trust rules:
+High visual storytelling.
 
-- only verified career facts
-- consequential actions stay inside user-defined authority
-- recommendations remain reviewable and correctable
+Its job is to:
 
-### Profile & Evidence
+- explain the Career Agent concept
+- show invisible system behavior
+- build trust
+- make autonomy understandable
+- create activation momentum
 
-Captures or imports the career source of truth.
+Implementation target:
+`11 Onboarding V2`
 
-The screen visibly distinguishes verified evidence from missing facts such as portfolio URL.
+### Dashboard
 
-### Career Direction
+Controlled operational density.
 
-Defines target role direction and work boundaries without treating job titles as absolute filters.
+Its job is to:
 
-### Preferences & Boundaries
+- surface live state
+- prioritize work
+- expose exceptions
+- show evidence and auditability
+- minimize distraction during daily use
 
-Models positive and negative work preferences plus the career-economics rule.
-
-The current personal design shows the USD 6.5k monthly target and deliberately leaves the minimum unresolved.
-
-### Application Authority
-
-Shows three explicit autonomy levels:
-
-- Automatic
-- Can auto-submit when verified
-- Always ask
-
-Auto-submit is visibly OFF during supervised rollout.
-
-### Connections & Sources
-
-Shows:
-
-- Remote OK
-- Remotive
-- We Work Remotely
-- optional Google Jobs provider
-- LinkedIn alerts and user-supplied links
-
-LinkedIn is not presented as a hidden scraping dependency.
-
-### Review & Activate
-
-Summarizes career and automation setup and exposes unresolved facts before activation.
-
-### Ready
-
-Confirms that discovery/evaluation can start while unattended auto-submit remains disabled until ATS validation is complete.
+Implementation target:
+`20 Dashboard`
 
 ## Home dashboard
 
 The approved Dashboard / Home frame is 1440 x 1100.
 
-### Sidebar
-
-Destinations:
+Sidebar destinations:
 
 - Today
 - Opportunities
@@ -115,62 +67,23 @@ Destinations:
 - Career Brain
 - Settings
 
-Worker state and last-cycle time appear at the bottom.
+Core Home content:
 
-### Header
-
-Shows:
-
-- personal greeting
-- active-representation statement
-- VPS online state
-- Run discovery now action
-
-### Operational metrics
-
-Four summary metrics:
-
+- VPS / worker state
+- Run discovery action
 - New opportunities
 - High priority
 - Submitted
 - Needs you
-
-These are operational metrics, not vanity analytics.
-
-### Priority opportunities
-
-Shows opportunity decisions such as:
-
-- High priority
-- Apply
-- Watch
-
-Each role includes short evidence/reason cues rather than one opaque numeric score.
-
-### Needs your decision
-
-Surfaces blocked work such as:
-
-- unresolved work authorization
-- missing compensation range
-
-The language states that Jobster stopped instead of guessing.
-
-### Pipeline
-
-Shows the current application flow from discovered through interview.
-
-### Recent activity
-
-Shows worker actions and links to the complete audit history.
-
-### Career Brain
-
-Shows evidence quality, stable direction, unresolved facts, and correction access without exposing model/provider internals.
+- Priority opportunities
+- Needs your decision
+- Pipeline
+- Recent activity
+- Career Brain status
 
 ## Local design system
 
-The file contains reusable local components:
+Reusable local components include:
 
 - Button / Primary
 - Button / Secondary
@@ -180,16 +93,18 @@ The file contains reusable local components:
 - Metric / Tile
 - Onboarding / Rail Content
 
-The file also contains local color, spacing, radius, typography, and elevation tokens.
+The file also contains local color, spacing, radius, typography and elevation tokens plus the Jobster V2 Visual palette.
 
 ## Implementation contract
 
-The coded web app should reproduce these approved frames using reusable frontend components mapped to backend state.
+Runtime values must come from Jobster services and SQLite/API state.
 
-Do not implement static fake dashboard data as production truth. Demo values in Figma are layout examples. Runtime values must come from Jobster services and SQLite/API state.
+Figma demo values are composition examples, not production data.
 
-The frontend must preserve the autonomy and truth boundaries defined in:
+The frontend must preserve the authority and truth boundaries defined in:
 
 - docs/product/AUTONOMY_POLICY.md
 - docs/security/PRIVACY_AND_TRUTH.md
 - docs/brain/CAREER_BRAIN.md
+
+Do not expose internal provider/model names, prompts, hidden chain-of-thought, routing weights, scoring formulas, repository internals, or private learning mechanics.
