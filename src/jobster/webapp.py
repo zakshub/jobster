@@ -782,6 +782,7 @@ def create_app() -> FastAPI:
                 {"name": "Lever", "level": "fill_and_submit"},
                 {"name": "Ashby", "level": "fill_and_submit"},
                 {"name": "Workday", "level": "check_only"},
+                {"name": "Company career forms", "level": "prepare_only"},
             ],
             "auto_apply": config.application.auto_submit,
             "submission_window_open": is_submission_allowed(
