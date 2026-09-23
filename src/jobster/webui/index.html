@@ -54,6 +54,12 @@
     <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10zM13.5 6.5 17 10"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 5-2 8 3 5-2v13l-5 2-8-3-5 2z"/><path d="M8 4v13M16 7v13"/></symbol>
+    <symbol id="i-health" viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6"/><circle cx="12" cy="12" r="9"/></symbol>
+    <symbol id="i-journal" viewBox="0 0 24 24"><path d="M5 4h13a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M8 4v16M11 8h5M11 12h5"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 24 24"><path d="M4 7h16v13H4zM3 4h18v3H3zM9 11h6"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M9 15 7 17a4 4 0 1 1-6-6l3-3a4 4 0 0 1 6 0M15 9l2-2a4 4 0 1 1 6 6l-3 3a4 4 0 0 1-6 0M8 12h8"/></symbol>
+    <symbol id="i-portfolio" viewBox="0 0 24 24"><path d="M4 7h16v13H4zM8 7V5h8v2M4 12h16M10 12v2h4v-2"/></symbol>
   </svg>
 
   <div class="app-shell">
@@ -97,6 +103,12 @@
         <div class="nav-label">INTELLIGENCE</div>
         <button class="nav-item" data-route="insights">
           <svg><use href="#i-chart"></use></svg><span>Insights</span>
+        </button>
+        <button class="nav-item" data-route="map">
+          <svg><use href="#i-map"></use></svg><span>Career Map</span>
+        </button>
+        <button class="nav-item" data-route="health">
+          <svg><use href="#i-health"></use></svg><span>Data Health</span>
         </button>
         <button class="nav-item" data-route="brain">
           <svg><use href="#i-brain"></use></svg><span>Career Brain</span>
@@ -553,6 +565,92 @@
         </div>
       </section>
 
+      <section class="view" id="view-map">
+        <div class="page-intro editorial-intro">
+          <div>
+            <div class="eyebrow">CAREER MAP</div>
+            <h2>See how your experience, skills, companies and opportunities connect.</h2>
+            <p>This map is built from your actual Jobster profile and stored opportunities. It is not a personality diagram.</p>
+          </div>
+          <div class="map-legend">
+            <span><i class="legend-dot person"></i>You</span>
+            <span><i class="legend-dot role"></i>Target roles</span>
+            <span><i class="legend-dot capability"></i>Capabilities</span>
+            <span><i class="legend-dot company"></i>Companies</span>
+            <span><i class="legend-dot job"></i>Strong jobs</span>
+          </div>
+        </div>
+        <div class="map-layout">
+          <section class="career-map-panel">
+            <div class="career-map-canvas" id="career-map-canvas">
+              <div class="empty-state">Your career map will appear here.</div>
+            </div>
+          </section>
+          <aside class="map-side">
+            <section class="editorial-note">
+              <div class="note-index">01</div>
+              <div><div class="eyebrow">MAP SUMMARY</div><div id="career-map-summary"></div></div>
+            </section>
+            <section class="editorial-note">
+              <div class="note-index">02</div>
+              <div><div class="eyebrow">PORTFOLIO PROOF</div><div id="portfolio-proof-summary"></div></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" id="view-health">
+        <div class="page-intro editorial-intro">
+          <div>
+            <div class="eyebrow">DATA HEALTH</div>
+            <h2>Keep the Career Brain clean, current and explainable.</h2>
+            <p>Jobster flags missing proof, old checks, contradictions and repeated learning signals without silently changing your career model.</p>
+          </div>
+          <div class="health-score-orb" id="health-score-orb">
+            <strong id="health-score">—</strong><span>health</span>
+          </div>
+        </div>
+
+        <div class="health-grid">
+          <section class="insight-sheet health-sheet-large">
+            <div class="sheet-number">01</div>
+            <div class="eyebrow">DATA ISSUES</div>
+            <h3>What should be cleaned up?</h3>
+            <div id="data-health-issues"></div>
+          </section>
+          <section class="insight-sheet">
+            <div class="sheet-number">02</div>
+            <div class="eyebrow">LEARNING SUGGESTIONS</div>
+            <h3>Changes Jobster will never make silently.</h3>
+            <div id="learning-suggestions"></div>
+          </section>
+          <section class="insight-sheet">
+            <div class="sheet-number">03</div>
+            <div class="eyebrow">SEARCH HISTORY</div>
+            <h3>What recent searches actually produced.</h3>
+            <div id="search-history"></div>
+          </section>
+          <section class="insight-sheet">
+            <div class="sheet-number">04</div>
+            <div class="eyebrow">USAGE</div>
+            <h3>What Jobster is consuming.</h3>
+            <div id="usage-center"></div>
+          </section>
+          <section class="insight-sheet">
+            <div class="sheet-number">05</div>
+            <div class="eyebrow">CONNECTIONS</div>
+            <h3>What is connected — and what is not.</h3>
+            <div id="integration-status"></div>
+          </section>
+          <section class="insight-sheet">
+            <div class="sheet-number">06</div>
+            <div class="eyebrow">PORTFOLIO MAP</div>
+            <h3>Where your proof is strong or thin.</h3>
+            <div id="portfolio-map"></div>
+          </section>
+        </div>
+      </section>
+
       <section class="view" id="view-brain">
         <div class="page-intro">
           <div>
@@ -694,6 +792,12 @@
               <label class="switch-row"><span><strong>Reduce motion</strong><small>Use fewer animations.</small></span><input type="checkbox" id="pref-motion"><i></i></label>
               <label class="switch-row"><span><strong>Compact job list</strong><small>Show more jobs on screen.</small></span><input type="checkbox" id="pref-compact"><i></i></label>
               <label class="switch-row"><span><strong>Open live job search automatically</strong><small>Show the live window when a search starts.</small></span><input type="checkbox" id="pref-terminal" checked><i></i></label>
+              <label class="preference-select-row"><span><strong>Visual mood</strong><small>Choose the interface atmosphere.</small></span>
+                <select id="pref-theme"><option value="editorial">Human editorial</option><option value="night">Night focus</option><option value="clean">Clean studio</option></select>
+              </label>
+              <label class="preference-select-row"><span><strong>Information density</strong><small>Choose how much fits on screen.</small></span>
+                <select id="pref-density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option><option value="dense">Dense</option></select>
+              </label>
             </div>
           </section>
           <section class="panel panel-wide authority-panel">
@@ -761,6 +865,17 @@
         <div class="detail-label">What to do next</div>
         <p id="drawer-next">—</p>
       </section>
+      <section class="detail-section decision-brief-section">
+        <div class="detail-label">Decision brief</div>
+        <div id="drawer-decision-brief" class="decision-brief">
+          <p>Open a reviewed job to see why Jobster kept it, what could go wrong, and what blocks automatic action.</p>
+        </div>
+        <button class="text-button" id="explain-job-btn"><svg><use href="#i-brain"></use></svg> Explain this job</button>
+      </section>
+      <section class="detail-section evidence-trace-section">
+        <div class="detail-label">Evidence used</div>
+        <div id="drawer-evidence-trace" class="evidence-trace"></div>
+      </section>
       <section class="detail-section feedback-section">
         <div class="detail-label">Teach Jobster</div>
         <p class="feedback-help">Your feedback improves future recommendations without silently changing your career model.</p>
@@ -775,11 +890,27 @@
         <div class="detail-label">Is this job still live?</div>
         <p id="verification-detail">Check the job page before preparing an application.</p>
       </section>
+      <section class="detail-section journal-section">
+        <div class="detail-label">Decision journal</div>
+        <div id="decision-journal-list" class="decision-journal-list"></div>
+        <div class="journal-compose">
+          <select id="journal-decision">
+            <option value="watch">Watch</option>
+            <option value="pursue">Pursue</option>
+            <option value="apply">Apply</option>
+            <option value="skip">Skip</option>
+            <option value="hold">Hold</option>
+          </select>
+          <input id="journal-reason" type="text" placeholder="Why did you decide this?" />
+          <button class="text-button" id="save-journal-btn"><svg><use href="#i-journal"></use></svg> Add entry</button>
+        </div>
+      </section>
       <section class="detail-section">
         <div class="detail-label">Your note</div>
         <textarea id="drawer-note-input" class="note-input" rows="3" placeholder="Add a private note about this job…"></textarea>
         <div class="note-actions">
           <button class="text-button" id="save-note-btn"><svg><use href="#i-note"></use></svg> Save note</button>
+          <button class="text-button" id="archive-job-btn"><svg><use href="#i-archive"></use></svg> Archive</button>
           <button class="text-button danger-link" id="dismiss-job-btn">Hide this job</button>
         </div>
       </section>
