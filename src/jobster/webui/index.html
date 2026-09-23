@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Jobster · Career Command Center</title>
+  <link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-kicker">PERSONAL CAREER AGENT</div>
+        <div class="brand-wordmark">JOBSTER</div>
+        <div class="brand-accent"></div>
+        <div class="brand-copy">Your career, continuously represented.</div>
+      </div>
+
+      <nav class="nav" aria-label="Primary">
+        <button class="nav-item is-active" data-route="overview">Overview</button>
+        <button class="nav-item" data-route="opportunities">Opportunities</button>
+        <button class="nav-item" data-route="applications">Applications</button>
+        <button class="nav-item" data-route="activity">Activity</button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="sidebar-status">
+          <span class="status-dot"></span>
+          <span id="sidebar-mode">Supervised mode</span>
+        </div>
+        <div class="principles">EVIDENCE BEFORE INFERENCE · TRUTH BEFORE POSITIONING · HUMAN AUTHORITY PRESERVED</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow" id="page-eyebrow">CAREER COMMAND CENTER</div>
+          <h1 id="page-title">Overview</h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="quota-mini" id="quota-mini">Search budget · —</div>
+          <button class="button button-secondary" id="refresh-btn">Refresh</button>
+          <button class="button button-primary" id="run-cycle-btn">Run search cycle</button>
+        </div>
+      </header>
+
+      <section class="view is-visible" id="view-overview">
+        <div class="hero">
+          <div>
+            <div class="eyebrow">PRIVATE CAREER OPERATIONS</div>
+            <h2>Your career, continuously represented.</h2>
+            <p>Discover opportunities, understand fit, prepare truthful applications, track outcomes and keep consequential decisions visible.</p>
+          </div>
+          <div class="hero-meta">
+            <div class="hero-meta-label">Current profile</div>
+            <div class="hero-meta-value" id="profile-name">Loading…</div>
+            <div class="hero-meta-sub" id="profile-headline">—</div>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric-card">
+            <div class="metric-label">Opportunities</div>
+            <div class="metric-value" id="metric-jobs">0</div>
+            <div class="metric-foot">discovered</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-label">High priority</div>
+            <div class="metric-value" id="metric-high">0</div>
+            <div class="metric-foot">worth active pursuit</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-label">Applications</div>
+            <div class="metric-value" id="metric-applications">0</div>
+            <div class="metric-foot">prepared or inspected</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-label">Submitted</div>
+            <div class="metric-value" id="metric-submitted">0</div>
+            <div class="metric-foot">confirmed</div>
+          </article>
+        </div>
+
+        <div class="overview-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="eyebrow">PRIORITY QUEUE</div>
+                <h3>Best current opportunities</h3>
+              </div>
+              <button class="text-button" data-route-jump="opportunities">View all</button>
+            </div>
+            <div class="job-list compact" id="priority-list">
+              <div class="empty-state">No evaluated opportunities yet.</div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="eyebrow">SYSTEM</div>
+                <h3>Operating status</h3>
+              </div>
+            </div>
+            <div class="status-list">
+              <div class="status-row"><span>Search cycle</span><strong id="cycle-status">Idle</strong></div>
+              <div class="status-row"><span>Final submission</span><strong id="submission-status">Off</strong></div>
+              <div class="status-row"><span>Submission window</span><strong id="window-status">—</strong></div>
+              <div class="status-row"><span>Search usage</span><strong id="quota-status">—</strong></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-opportunities">
+        <div class="toolbar">
+          <div class="filter-group" role="group" aria-label="Opportunity filter">
+            <button class="chip is-active" data-filter="all">All</button>
+            <button class="chip" data-filter="aggressive_pursuit">Aggressive</button>
+            <button class="chip" data-filter="high_priority">High priority</button>
+            <button class="chip" data-filter="apply">Apply</button>
+            <button class="chip" data-filter="watch">Watch</button>
+          </div>
+          <input class="search-input" id="job-search" type="search" placeholder="Search company or role" />
+        </div>
+        <div class="job-list" id="jobs-list">
+          <div class="empty-state">No jobs loaded.</div>
+        </div>
+      </section>
+
+      <section class="view" id="view-applications">
+        <div class="application-summary">
+          <div>
+            <div class="eyebrow">APPLICATION CONTROL</div>
+            <h2>Human authority stays visible.</h2>
+            <p>Prepared, blocked and submitted states are shown separately. Sensitive or unknown answers stop automation instead of being guessed.</p>
+          </div>
+          <div class="mode-card">
+            <div class="mode-label">Current mode</div>
+            <div class="mode-value" id="application-mode">Supervised</div>
+          </div>
+        </div>
+        <div class="application-list" id="applications-list">
+          <div class="empty-state">No application plans yet.</div>
+        </div>
+      </section>
+
+      <section class="view" id="view-activity">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">AUDIT TRAIL</div>
+              <h3>Recent system activity</h3>
+            </div>
+          </div>
+          <div class="activity-list" id="activity-list">
+            <div class="empty-state">No activity recorded yet.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <aside class="drawer" id="job-drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div>
+        <div class="eyebrow" id="drawer-source">OPPORTUNITY</div>
+        <h2 id="drawer-title">Role</h2>
+        <div class="drawer-company" id="drawer-company">Company</div>
+      </div>
+      <button class="drawer-close" id="drawer-close" aria-label="Close">×</button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-score">
+        <div>
+          <div class="metric-label">Interest</div>
+          <div class="drawer-score-value" id="drawer-score">—</div>
+        </div>
+        <div class="decision-badge" id="drawer-decision">—</div>
+      </div>
+      <section class="detail-section">
+        <div class="detail-label">Assessment</div>
+        <p id="drawer-summary">—</p>
+      </section>
+      <section class="detail-section">
+        <div class="detail-label">Strong matches</div>
+        <div class="tag-list" id="drawer-matches"></div>
+      </section>
+      <section class="detail-section">
+        <div class="detail-label">Gaps / unknowns</div>
+        <div class="tag-list muted" id="drawer-gaps"></div>
+      </section>
+      <section class="detail-section">
+        <div class="detail-label">Next action</div>
+        <p id="drawer-next">—</p>
+      </section>
+      <div class="drawer-actions">
+        <button class="button button-secondary" id="open-job-btn">Open job</button>
+        <button class="button button-primary" id="prepare-job-btn">Prepare application</button>
+      </div>
+      <div class="drawer-note" id="drawer-note"></div>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast"></div>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>
