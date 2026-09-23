@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from collections import Counter
+from collections.abc import Callable
+
 from .brain import CareerBrain
 from .discovery import discover
 from .models import CareerProfile, PursuitDecision
 from .orchestrator import process_applications
 from .quota import SerpApiQuota
+from .relevance import select_relevant_jobs
 from .semantic import SemanticCareerBrain
 from .settings import SearchConfig
 from .sources import (
@@ -17,6 +21,9 @@ from .sources import (
     WeWorkRemotelySource,
 )
 from .storage import JobsterStore
+
+
+RunEventHandler = Callable[[str, dict], None]
 
 
 def build_sources(config: SearchConfig) -> list[JobSource]:
@@ -81,8 +88,13 @@ def run_cycle(
     config: SearchConfig,
     store: JobsterStore,
     sources: list[JobSource] | None = None,
+    on_event: RunEventHandler | None = None,
 ) -> dict:
     active_sources = sources if sources is not None else build_sources(config)
+
+    def emit(event: str, payload: dict) -> None:
+        if on_event is not None:
+            on_event(event, payload)
 
     def record_source_error(source_name: str, exc: Exception) -> None:
         store.audit(
@@ -90,12 +102,63 @@ def run_cycle(
             {"source": source_name, "error": str(exc)},
         )
 
-    jobs = discover(active_sources, on_error=record_source_error)
+    emit(
+        "cycle_started",
+        {
+            "sources": [source.name for source in active_sources],
+            "target_titles": profile.target_titles,
+        },
+    )
+
+    discovered = discover(
+        active_sources,
+        on_error=record_source_error,
+        on_event=emit,
+    )
+    raw_by_source = dict(Counter(job.source for job in discovered))
+
+    if config.intake.enabled:
+        jobs, rejected = select_relevant_jobs(
+            profile,
+            discovered,
+            min_score=config.intake.min_title_score,
+            max_per_source=config.intake.max_per_source,
+            max_total=config.intake.max_total,
+        )
+    else:
+        jobs, rejected = discovered, []
+
+    admitted_by_source = dict(Counter(job.source for job in jobs))
+    rejection_reasons = Counter(result.reason for _, result in rejected)
+    emit(
+        "intake_completed",
+        {
+            "raw": len(discovered),
+            "admitted": len(jobs),
+            "rejected": len(rejected),
+            "raw_by_source": raw_by_source,
+            "admitted_by_source": admitted_by_source,
+            "top_rejection_reasons": dict(rejection_reasons.most_common(6)),
+        },
+    )
+
     baseline_brain = CareerBrain()
     semantic_brain = SemanticCareerBrain()
 
     evaluations = []
-    for job in jobs:
+    total = len(jobs)
+    for index, job in enumerate(jobs, start=1):
+        emit(
+            "evaluation_started",
+            {
+                "index": index,
+                "total": total,
+                "job_id": job.id,
+                "title": job.title,
+                "company": job.company,
+                "source": job.source,
+            },
+        )
         store.save_job(job)
         baseline = baseline_brain.evaluate(profile, job)
         evaluation = (
@@ -115,19 +178,40 @@ def run_cycle(
             job_id=job.id,
         )
         evaluations.append(evaluation)
+        emit(
+            "evaluation_completed",
+            {
+                "index": index,
+                "total": total,
+                "job_id": job.id,
+                "title": job.title,
+                "company": job.company,
+                "decision": evaluation.pursuit_decision.value,
+                "interest_score": evaluation.interest_score,
+            },
+        )
 
     counts = {decision.value: 0 for decision in PursuitDecision}
     for evaluation in evaluations:
         counts[evaluation.pursuit_decision.value] += 1
 
+    emit(
+        "application_preflight_started",
+        {"candidates": sum(counts[key] for key in ("apply", "high_priority", "aggressive_pursuit"))},
+    )
     applications = process_applications(jobs, evaluations, config, store)
 
     summary = {
+        "raw_discovered": len(discovered),
         "discovered": len(jobs),
+        "rejected_irrelevant": len(rejected),
         "evaluated": len(evaluations),
         "sources": [source.name for source in active_sources],
+        "raw_by_source": raw_by_source,
+        "admitted_by_source": admitted_by_source,
         "decisions": counts,
         "applications": applications,
     }
     store.audit("discovery_cycle_completed", summary)
+    emit("cycle_completed", summary)
     return summary
