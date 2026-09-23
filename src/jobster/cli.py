@@ -117,5 +117,17 @@ def doctor(
     console.print(table)
 
 
+@app.command("ui")
+def ui(
+    host: str = typer.Option("127.0.0.1", help="Bind host"),
+    port: int = typer.Option(8765, min=1, max=65535, help="Bind port"),
+):
+    """Run the local Jobster career command center."""
+    from .webapp import run_web
+
+    console.print(f"Jobster UI: http://{host}:{port}")
+    run_web(host=host, port=port)
+
+
 if __name__ == "__main__":
     app()
