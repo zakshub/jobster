@@ -116,3 +116,10 @@ Coded web frontend implementation and hosting remain separate from the approved 
 - [x] Application preparation re-verifies source before creating artifacts
 - [x] Common job-feed text encoding repair
 - [x] Reduced-motion accessibility for UI animations
+
+## Plain-English product language
+
+- [x] User-facing copy is English-only
+- [x] User-facing wording avoids developer jargon where a simple phrase is available
+- [x] Beginner, junior, senior and non-technical users should be able to understand core actions without knowing APIs, ATS terminology, semantic scoring or backend architecture
+- [x] Technical names remain internal unless they are necessary to explain a real limitation
