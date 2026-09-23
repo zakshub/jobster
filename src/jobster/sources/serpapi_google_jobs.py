@@ -5,6 +5,7 @@ import os
 import httpx
 
 from jobster.models import Job
+from jobster.quota import SerpApiQuota
 from .base import JobSource
 
 
@@ -43,15 +44,26 @@ def parse_google_jobs(payload: dict) -> list[Job]:
 class SerpApiGoogleJobsSource(JobSource):
     name = "google_jobs"
 
-    def __init__(self, query: str, location: str | None = None, api_key: str | None = None, timeout: float = 30.0):
+    def __init__(
+        self,
+        query: str,
+        location: str | None = None,
+        api_key: str | None = None,
+        timeout: float = 30.0,
+        quota: SerpApiQuota | None = None,
+    ):
         self.query = query
         self.location = location
         self.api_key = api_key or os.getenv("SERPAPI_API_KEY")
         self.timeout = timeout
+        self.quota = quota
 
     def fetch(self) -> list[Job]:
         if not self.api_key:
             raise RuntimeError("SERPAPI_API_KEY is required for Google Jobs discovery")
+        if self.quota is not None and not self.quota.consume(1):
+            return []
+
         params = {"engine": "google_jobs", "q": self.query, "api_key": self.api_key}
         if self.location:
             params["location"] = self.location
