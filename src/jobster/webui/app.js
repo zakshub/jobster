@@ -32,12 +32,12 @@ const pageMeta = {
 const stageLabels = {
   idle: "Idle",
   starting: "Starting",
-  discovering: "Discovering",
-  filtering: "Filtering",
-  evaluating: "Evaluating",
-  preparing: "Preflight",
-  complete: "Complete",
-  failed: "Failed",
+  discovering: "Searching job sites",
+  filtering: "Removing unrelated jobs",
+  evaluating: "Checking job fit",
+  preparing: "Checking applications",
+  complete: "Done",
+  failed: "Needs attention",
 };
 
 function esc(value) {
@@ -57,12 +57,12 @@ function decisionTone(decision) {
 
 function verificationLabel(stateValue) {
   return {
-    live: "Live verified",
-    protected: "Protected source",
-    expired: "Expired",
-    unreachable: "Unreachable",
-    needs_review: "Needs review",
-    unverifiable: "No source URL",
+    live: "Job is live",
+    protected: "Could not check automatically",
+    expired: "Job closed",
+    unreachable: "Could not open job page",
+    needs_review: "Needs a quick check",
+    unverifiable: "No job link available",
   }[stateValue] || "Not verified";
 }
 
@@ -165,10 +165,10 @@ function renderStatus() {
   $("window-status").textContent = submission.window_open ? "Open" : "Paused";
   $("sidebar-mode").textContent = submission.auto_submit ? "Automatic mode" : "Supervised mode";
   $("application-mode").textContent = submission.auto_submit ? "Automatic" : "Supervised";
-  $("intake-status").textContent = intake?.enabled ? `On · ≥${intake.min_title_score}` : "Off";
+  $("intake-status").textContent = intake?.enabled ? `On` : "Off";
   $("intake-copy").textContent = intake?.enabled
-    ? `Title relevance ≥ ${intake.min_title_score}/100 · max ${intake.max_per_source} per source · max ${intake.max_total} per cycle. Non-target roles are filtered before semantic evaluation.`
-    : "Strict intake is disabled.";
+    ? `Jobster hides unrelated jobs before spending time reviewing them. It also limits how many jobs one website can add, so one source cannot flood your list.`
+    : "Relevant job filtering is turned off.";
 
   if (cycle.running) {
     $("cycle-status").textContent = stageLabels[cycle.stage] || "Running";
@@ -290,7 +290,7 @@ function renderVerification(verification) {
   const stateValue = verification?.state || "unknown";
   $("drawer-verification").dataset.state = stateValue;
   $("drawer-verification").textContent = verificationLabel(stateValue);
-  $("verification-detail").textContent = verification?.detail || "Verify the source before application preparation.";
+  $("verification-detail").textContent = verification?.detail || "Check that the job is still open before preparing the application.";
 }
 
 async function openJob(jobId) {
@@ -305,8 +305,8 @@ async function openJob(jobId) {
     $("drawer-score").textContent = Number.isFinite(evaluation.interest_score) ? evaluation.interest_score : "—";
     $("drawer-decision").textContent = labels[evaluation.pursuit_decision] || evaluation.pursuit_decision || "Pending";
     $("drawer-decision").dataset.tone = decisionTone(evaluation.pursuit_decision);
-    $("drawer-summary").textContent = evaluation.summary || evaluation.role_interpretation || "No assessment available yet.";
-    $("drawer-next").textContent = evaluation.next_action || "Evaluate this opportunity first.";
+    $("drawer-summary").textContent = evaluation.summary || evaluation.role_interpretation || "Jobster has not reviewed this job yet.";
+    $("drawer-next").textContent = evaluation.next_action || "Review this job first.";
 
     const matches = evaluation.strong_matches || [];
     $("drawer-matches").innerHTML = matches.length
@@ -324,7 +324,7 @@ async function openJob(jobId) {
     $("prepare-job-btn").disabled = !bundle.evaluation;
     $("drawer-note").textContent = bundle.application
       ? `Application state: ${bundle.application.state}. ${(bundle.application.reasons || []).join(" ")}`
-      : "No application inspection has been saved for this role yet.";
+      : "This application has not been checked yet.";
 
     $("drawer-backdrop").classList.add("is-visible");
     $("job-drawer").classList.add("is-visible");
@@ -345,17 +345,17 @@ async function verifySelectedJob() {
   if (!jobId) return;
   try {
     $("verify-job-btn").disabled = true;
-    $("verify-job-btn").textContent = "Verifying…";
+    $("verify-job-btn").textContent = "Checking…";
     const result = await api(`/api/jobs/${encodeURIComponent(jobId)}/verify`, { method: "POST" });
     renderVerification(result);
     state.selectedJob.verification = result;
-    showToast(`Verification: ${verificationLabel(result.state)}`);
+    showToast(`Job check: ${verificationLabel(result.state)}`);
     await loadAll();
   } catch (error) {
     showToast(error.message);
   } finally {
     $("verify-job-btn").disabled = false;
-    $("verify-job-btn").textContent = "Verify live";
+    $("verify-job-btn").textContent = "Check job";
   }
 }
 
@@ -381,7 +381,7 @@ function appendTerminalEvent(item) {
   const time = Number.isNaN(stamp.getTime()) ? "--:--:--" : stamp.toLocaleTimeString([], { hour12: false });
   line.innerHTML = `
     <span class="time">${esc(time)}</span>
-    <span class="event">${esc(item.event.replaceAll("_", " "))}</span>
+    <span class="event">${esc(event)}</span>
     <span class="message">${esc(item.message)}</span>
   `;
   body.appendChild(line);
@@ -443,7 +443,7 @@ async function runCycle() {
     if (!result.started) {
       showToast("A research cycle is already running.");
     } else {
-      showToast("Targeted research started.");
+      showToast("Job search started.");
     }
     await pollCycle();
   } catch (error) {
@@ -463,9 +463,9 @@ async function pollCycle() {
     return;
   }
   if (cycle.last_error) {
-    showToast(`Research failed: ${cycle.last_error}`);
+    showToast(`Job search stopped: ${cycle.last_error}`);
   } else if (cycle.last_summary) {
-    showToast(`Research complete · ${cycle.last_summary.discovered || 0} relevant · ${cycle.last_summary.rejected_irrelevant || 0} noise blocked`);
+    showToast(`Job search finished · ${cycle.last_summary.discovered || 0} suitable jobs · ${cycle.last_summary.rejected_irrelevant || 0} unrelated jobs hidden`);
   }
   await loadAll();
 }
@@ -475,11 +475,11 @@ async function prepareSelectedJob() {
   if (!jobId) return;
   try {
     $("prepare-job-btn").disabled = true;
-    $("prepare-job-btn").textContent = "Verifying + preparing…";
+    $("prepare-job-btn").textContent = "Checking job + preparing…";
     const result = await api(`/api/jobs/${encodeURIComponent(jobId)}/prepare`, { method: "POST" });
     renderVerification(result.verification);
     $("drawer-note").textContent = `Application packet prepared: ${result.resume_markdown || "artifact created"}`;
-    showToast("Live source verified and application packet prepared.");
+    showToast("Job checked and application prepared.");
     await loadAll();
   } catch (error) {
     showToast(error.message);
