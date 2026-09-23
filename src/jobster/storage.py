@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 
 from .models import ApplicationPlan, Job, JobEvaluation
+from .text_utils import repair_text
 
 
 SCHEMA = """
@@ -48,6 +49,15 @@ CREATE TABLE IF NOT EXISTS audit_events (
     event_type TEXT NOT NULL,
     payload_json TEXT NOT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS job_verifications (
+    job_id TEXT PRIMARY KEY,
+    state TEXT NOT NULL,
+    status_code INTEGER,
+    final_url TEXT,
+    detail TEXT NOT NULL,
+    checked_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
 """
 
@@ -128,6 +138,35 @@ class JobsterStore:
                 (job_id, event_type, json.dumps(payload, sort_keys=True)),
             )
 
+    def save_job_verification(self, job_id: str, verification: dict) -> None:
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO job_verifications(job_id, state, status_code, final_url, detail)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(job_id) DO UPDATE SET
+                  state=excluded.state,
+                  status_code=excluded.status_code,
+                  final_url=excluded.final_url,
+                  detail=excluded.detail,
+                  checked_at=CURRENT_TIMESTAMP""",
+                (
+                    job_id,
+                    str(verification.get("state", "needs_review")),
+                    verification.get("status_code"),
+                    verification.get("final_url"),
+                    str(verification.get("detail", "")),
+                ),
+            )
+
+    def get_job_verification(self, job_id: str) -> dict | None:
+        with self.connect() as con:
+            row = con.execute(
+                """SELECT state, status_code, final_url, detail, checked_at
+                FROM job_verifications WHERE job_id = ?""",
+                (job_id,),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
     def dashboard_metrics(self) -> dict:
         with self.connect() as con:
             jobs = con.execute("SELECT COUNT(*) AS n FROM jobs").fetchone()["n"]
@@ -175,10 +214,13 @@ class JobsterStore:
                     e.decision,
                     e.payload_json AS evaluation_json,
                     p.state AS application_state,
-                    p.ats
+                    p.ats,
+                    v.state AS verification_state,
+                    v.checked_at AS verification_checked_at
                 FROM jobs j
                 LEFT JOIN evaluations e ON e.job_id = j.id
                 LEFT JOIN application_plans p ON p.job_id = j.id
+                LEFT JOIN job_verifications v ON v.job_id = j.id
                 ORDER BY
                     CASE e.decision
                         WHEN 'aggressive_pursuit' THEN 0
@@ -206,11 +248,11 @@ class JobsterStore:
             output.append(
                 {
                     "id": row["id"],
-                    "title": row["title"],
-                    "company": row["company"],
+                    "title": repair_text(row["title"]),
+                    "company": repair_text(row["company"]),
                     "source": row["source"],
                     "url": row["url"],
-                    "location": job.get("location"),
+                    "location": repair_text(job.get("location")) if job.get("location") else None,
                     "remote": job.get("remote"),
                     "salary_min_monthly": job.get("salary_min_monthly"),
                     "salary_max_monthly": job.get("salary_max_monthly"),
@@ -223,6 +265,8 @@ class JobsterStore:
                     "eligible": evaluation.get("eligible") if evaluation else None,
                     "application_state": row["application_state"],
                     "ats": row["ats"],
+                    "verification_state": row["verification_state"],
+                    "verification_checked_at": row["verification_checked_at"],
                     "updated_at": row["updated_at"],
                 }
             )
@@ -235,18 +279,38 @@ class JobsterStore:
                 SELECT
                     j.payload_json AS job_json,
                     e.payload_json AS evaluation_json,
-                    p.payload_json AS application_json
+                    p.payload_json AS application_json,
+                    v.state AS verification_state,
+                    v.status_code AS verification_status_code,
+                    v.final_url AS verification_final_url,
+                    v.detail AS verification_detail,
+                    v.checked_at AS verification_checked_at
                 FROM jobs j
                 LEFT JOIN evaluations e ON e.job_id = j.id
                 LEFT JOIN application_plans p ON p.job_id = j.id
+                LEFT JOIN job_verifications v ON v.job_id = j.id
                 WHERE j.id = ?
                 """,
                 (job_id,),
             ).fetchone()
         if row is None:
             return None
+        job_payload = json.loads(row["job_json"])
+        job_payload["title"] = repair_text(job_payload.get("title"))
+        job_payload["company"] = repair_text(job_payload.get("company"))
+        if job_payload.get("location"):
+            job_payload["location"] = repair_text(job_payload.get("location"))
+        verification = None
+        if row["verification_state"]:
+            verification = {
+                "state": row["verification_state"],
+                "status_code": row["verification_status_code"],
+                "final_url": row["verification_final_url"],
+                "detail": row["verification_detail"],
+                "checked_at": row["verification_checked_at"],
+            }
         return {
-            "job": json.loads(row["job_json"]),
+            "job": job_payload,
             "evaluation": (
                 json.loads(row["evaluation_json"])
                 if row["evaluation_json"]
@@ -257,6 +321,7 @@ class JobsterStore:
                 if row["application_json"]
                 else None
             ),
+            "verification": verification,
         }
 
     def list_application_summaries(self, limit: int = 100) -> list[dict]:
