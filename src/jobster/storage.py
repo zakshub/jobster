@@ -59,6 +59,14 @@ CREATE TABLE IF NOT EXISTS job_verifications (
     checked_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
+CREATE TABLE IF NOT EXISTS job_preferences (
+    job_id TEXT PRIMARY KEY,
+    saved INTEGER NOT NULL DEFAULT 0,
+    dismissed INTEGER NOT NULL DEFAULT 0,
+    note TEXT,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
 """
 
 
@@ -167,6 +175,71 @@ class JobsterStore:
             ).fetchone()
         return dict(row) if row is not None else None
 
+    def save_job_preference(
+        self,
+        job_id: str,
+        *,
+        saved: bool | None = None,
+        dismissed: bool | None = None,
+        note: str | None = None,
+    ) -> dict:
+        with self.connect() as con:
+            existing = con.execute(
+                "SELECT saved, dismissed, note FROM job_preferences WHERE job_id = ?",
+                (job_id,),
+            ).fetchone()
+            current_saved = bool(existing["saved"]) if existing else False
+            current_dismissed = bool(existing["dismissed"]) if existing else False
+            current_note = existing["note"] if existing else None
+
+            next_saved = current_saved if saved is None else bool(saved)
+            next_dismissed = current_dismissed if dismissed is None else bool(dismissed)
+            next_note = current_note if note is None else note
+
+            con.execute(
+                """INSERT INTO job_preferences(job_id, saved, dismissed, note)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(job_id) DO UPDATE SET
+                  saved=excluded.saved,
+                  dismissed=excluded.dismissed,
+                  note=excluded.note,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (
+                    job_id,
+                    1 if next_saved else 0,
+                    1 if next_dismissed else 0,
+                    next_note,
+                ),
+            )
+        return {
+            "job_id": job_id,
+            "saved": next_saved,
+            "dismissed": next_dismissed,
+            "note": next_note,
+        }
+
+    def get_job_preference(self, job_id: str) -> dict:
+        with self.connect() as con:
+            row = con.execute(
+                "SELECT saved, dismissed, note, updated_at FROM job_preferences WHERE job_id = ?",
+                (job_id,),
+            ).fetchone()
+        if row is None:
+            return {
+                "job_id": job_id,
+                "saved": False,
+                "dismissed": False,
+                "note": None,
+                "updated_at": None,
+            }
+        return {
+            "job_id": job_id,
+            "saved": bool(row["saved"]),
+            "dismissed": bool(row["dismissed"]),
+            "note": row["note"],
+            "updated_at": row["updated_at"],
+        }
+
     def dashboard_metrics(self) -> dict:
         with self.connect() as con:
             jobs = con.execute("SELECT COUNT(*) AS n FROM jobs").fetchone()["n"]
@@ -188,6 +261,9 @@ class JobsterStore:
             high_priority = con.execute(
                 "SELECT COUNT(*) AS n FROM evaluations WHERE decision IN ('high_priority', 'aggressive_pursuit')"
             ).fetchone()["n"]
+            saved = con.execute(
+                "SELECT COUNT(*) AS n FROM job_preferences WHERE saved = 1"
+            ).fetchone()["n"]
 
         return {
             "jobs": jobs,
@@ -197,6 +273,7 @@ class JobsterStore:
             "ready": ready,
             "blocked": blocked,
             "high_priority": high_priority,
+            "saved": saved,
         }
 
     def list_job_summaries(self, limit: int = 100, offset: int = 0) -> list[dict]:
@@ -216,11 +293,15 @@ class JobsterStore:
                     p.state AS application_state,
                     p.ats,
                     v.state AS verification_state,
-                    v.checked_at AS verification_checked_at
+                    v.checked_at AS verification_checked_at,
+                    COALESCE(pref.saved, 0) AS saved,
+                    COALESCE(pref.dismissed, 0) AS dismissed,
+                    pref.note AS preference_note
                 FROM jobs j
                 LEFT JOIN evaluations e ON e.job_id = j.id
                 LEFT JOIN application_plans p ON p.job_id = j.id
                 LEFT JOIN job_verifications v ON v.job_id = j.id
+                LEFT JOIN job_preferences pref ON pref.job_id = j.id
                 ORDER BY
                     CASE e.decision
                         WHEN 'aggressive_pursuit' THEN 0
@@ -267,6 +348,9 @@ class JobsterStore:
                     "ats": row["ats"],
                     "verification_state": row["verification_state"],
                     "verification_checked_at": row["verification_checked_at"],
+                    "saved": bool(row["saved"]),
+                    "dismissed": bool(row["dismissed"]),
+                    "note": row["preference_note"],
                     "updated_at": row["updated_at"],
                 }
             )
@@ -284,11 +368,15 @@ class JobsterStore:
                     v.status_code AS verification_status_code,
                     v.final_url AS verification_final_url,
                     v.detail AS verification_detail,
-                    v.checked_at AS verification_checked_at
+                    v.checked_at AS verification_checked_at,
+                    COALESCE(pref.saved, 0) AS saved,
+                    COALESCE(pref.dismissed, 0) AS dismissed,
+                    pref.note AS preference_note
                 FROM jobs j
                 LEFT JOIN evaluations e ON e.job_id = j.id
                 LEFT JOIN application_plans p ON p.job_id = j.id
                 LEFT JOIN job_verifications v ON v.job_id = j.id
+                LEFT JOIN job_preferences pref ON pref.job_id = j.id
                 WHERE j.id = ?
                 """,
                 (job_id,),
@@ -322,6 +410,12 @@ class JobsterStore:
                 else None
             ),
             "verification": verification,
+            "preference": {
+                "job_id": job_id,
+                "saved": bool(row["saved"]),
+                "dismissed": bool(row["dismissed"]),
+                "note": row["preference_note"],
+            },
         }
 
     def list_application_summaries(self, limit: int = 100) -> list[dict]:
@@ -379,3 +473,82 @@ class JobsterStore:
             }
             for row in rows
         ]
+
+
+    def pipeline_counts(self) -> dict:
+        with self.connect() as con:
+            rows = con.execute(
+                "SELECT state, COUNT(*) AS n FROM application_plans GROUP BY state"
+            ).fetchall()
+        counts = {row["state"]: row["n"] for row in rows}
+        return {
+            "preparing": counts.get("preparing", 0),
+            "blocked": counts.get("blocked", 0),
+            "ready": counts.get("ready", 0),
+            "submitted": counts.get("submitted", 0),
+            "interviewing": counts.get("interviewing", 0),
+            "offer": counts.get("offer", 0),
+            "closed": counts.get("closed", 0),
+        }
+
+    def list_needs_attention(self, limit: int = 100) -> list[dict]:
+        with self.connect() as con:
+            rows = con.execute(
+                """
+                SELECT
+                    p.job_id,
+                    p.state,
+                    p.payload_json,
+                    p.updated_at,
+                    j.title,
+                    j.company,
+                    j.url,
+                    v.state AS verification_state,
+                    v.detail AS verification_detail
+                FROM application_plans p
+                JOIN jobs j ON j.id = p.job_id
+                LEFT JOIN job_verifications v ON v.job_id = j.id
+                WHERE p.state = 'blocked'
+                   OR v.state IN ('expired', 'unreachable', 'needs_review')
+                ORDER BY p.updated_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+        output = []
+        for row in rows:
+            plan = json.loads(row["payload_json"])
+            blocked_questions = [
+                item.get("label")
+                for item in plan.get("blocked_questions", [])
+                if item.get("label")
+            ]
+            unknown_questions = [
+                item.get("label")
+                for item in plan.get("unknown_questions", [])
+                if item.get("label")
+            ]
+            reasons = list(plan.get("reasons", []))
+            if row["verification_detail"] and row["verification_state"] in {
+                "expired",
+                "unreachable",
+                "needs_review",
+            }:
+                reasons.append(row["verification_detail"])
+
+            output.append(
+                {
+                    "job_id": row["job_id"],
+                    "title": repair_text(row["title"]),
+                    "company": repair_text(row["company"]),
+                    "url": row["url"],
+                    "state": row["state"],
+                    "reasons": reasons,
+                    "blocked_questions": blocked_questions,
+                    "unknown_questions": unknown_questions,
+                    "verification_state": row["verification_state"],
+                    "updated_at": row["updated_at"],
+                }
+            )
+        return output
