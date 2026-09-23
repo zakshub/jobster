@@ -6,7 +6,20 @@ const state = {
   attention: [],
   readiness: null,
   settings: null,
+  missions: [],
+  insights: null,
+  evidence: null,
+  companies: [],
+  contacts: [],
+  interviews: [],
+  offers: [],
+  authority: {},
+  notifications: [],
+  goals: [],
+  feedback: [],
   selectedJob: null,
+  selectedOffer: null,
+  compareIds: [],
   filter: "all",
   sourceFilter: "all",
   sort: "best",
@@ -24,9 +37,29 @@ const routeMeta = {
   opportunities: ["DISCOVERY + FIT", "Opportunities"],
   applications: ["APPLICATION PIPELINE", "Applications"],
   attention: ["HUMAN CHECKPOINTS", "Needs you"],
+  companies: ["COMPANY RADAR", "Companies"],
+  people: ["CAREER RELATIONSHIPS", "People"],
+  interviews: ["INTERVIEW ROOM", "Interviews"],
+  offers: ["DECISION DESK", "Offers"],
+  insights: ["CAREER INTELLIGENCE", "Insights"],
   brain: ["CAREER MODEL", "Career Brain"],
   activity: ["HISTORY", "Activity"],
-  settings: ["PREFERENCES", "Settings"],
+  settings: ["PREFERENCES + AUTHORITY", "Settings"],
+};
+
+const routeIcons = {
+  today: "home",
+  opportunities: "compass",
+  applications: "briefcase",
+  attention: "alert",
+  companies: "building",
+  people: "users",
+  interviews: "calendar",
+  offers: "offer",
+  insights: "chart",
+  brain: "brain",
+  activity: "activity",
+  settings: "settings",
 };
 
 const decisionLabels = {
@@ -47,11 +80,20 @@ const activityLabels = {
   application_execution: "Application action completed",
   application_browser_error: "Application page problem",
   application_submission_window_closed: "Application paused by schedule",
+  application_submission_not_authorized: "Final submission not authorized",
+  application_preparation_paused: "Application preparation paused",
   discovery_cycle_completed: "Job search finished",
   job_verified: "Job page checked",
   application_packet_prepared_from_ui: "Application files prepared",
   job_preference_updated: "Job preference updated",
   ai_review_paused: "Advanced review paused",
+  career_feedback_added: "Career feedback saved",
+  company_watch_updated: "Company watch updated",
+  contact_saved: "Career contact saved",
+  interview_saved: "Interview saved",
+  offer_saved: "Offer saved",
+  career_goal_saved: "Career goal saved",
+  automation_authority_updated: "Authority changed",
 };
 
 const terminalLabels = {
@@ -93,13 +135,94 @@ const verificationLabels = {
 };
 
 const pipelineLabels = {
+  discovered: "Found",
+  normalized: "Checked",
+  evaluated: "Reviewed",
+  rejected: "Passed",
+  shortlisted: "Shortlisted",
   preparing: "Preparing",
   blocked: "Needs you",
   ready: "Ready",
   submitted: "Submitted",
+  recruiter_contacted: "Recruiter contacted",
   interviewing: "Interviews",
   offer: "Offers",
+  negotiating: "Negotiating",
   closed: "Closed",
+  failed: "Problem",
+};
+
+const authorityCopy = {
+  search: ["Find jobs", "Search approved sources and collect suitable opportunities.", "compass"],
+  prepare: ["Prepare applications", "Check forms and prepare known answers and files.", "briefcase"],
+  submit: ["Submit applications", "Press the final submit button only inside your approved rules.", "check"],
+  contact: ["Contact people", "Send recruiter or hiring-contact messages when this is connected.", "mail"],
+  follow_up: ["Follow up", "Send approved follow-up messages when timing and context are right.", "clock"],
+};
+
+const missionIcons = {
+  needs_you: "alert",
+  opportunity: "spark",
+  ready: "briefcase",
+  interview: "calendar",
+  offer: "offer",
+  search: "compass",
+};
+
+const modalSchemas = {
+  contact: {
+    kicker: "PEOPLE",
+    title: "Add career contact",
+    endpoint: "/api/contacts",
+    fields: [
+      ["name", "Name", "text", true],
+      ["company", "Company", "text", false],
+      ["role", "Role / title", "text", false],
+      ["email", "Email", "email", false],
+      ["linkedin_url", "LinkedIn URL", "url", false],
+      ["relationship", "Relationship", "select", false, ["new","contacted","replied","interviewed_with","worked_with"]],
+      ["note", "Private note", "textarea", false],
+    ],
+  },
+  interview: {
+    kicker: "INTERVIEWS",
+    title: "Add interview",
+    endpoint: "/api/interviews",
+    fields: [
+      ["company", "Company", "text", true],
+      ["title", "Role", "text", true],
+      ["scheduled_at", "Date and time", "datetime-local", false],
+      ["format", "Format", "select", false, ["Video call","Phone","Portfolio review","Hiring manager","Panel","On-site","Other"]],
+      ["status", "Status", "select", false, ["planned","confirmed","completed","cancelled"]],
+      ["note", "Preparation note", "textarea", false],
+    ],
+  },
+  offer: {
+    kicker: "OFFERS",
+    title: "Add offer",
+    endpoint: "/api/offers",
+    fields: [
+      ["company", "Company", "text", true],
+      ["title", "Role", "text", true],
+      ["currency", "Currency", "text", false, null, "USD"],
+      ["monthly_base", "Monthly base pay", "number", false],
+      ["bonus", "Bonus", "text", false],
+      ["equity", "Equity", "text", false],
+      ["status", "Status", "select", false, ["reviewing","negotiating","accepted","declined","closed"]],
+      ["note", "Decision note", "textarea", false],
+    ],
+  },
+  goal: {
+    kicker: "CAREER BRAIN",
+    title: "Add career goal",
+    endpoint: "/api/goals",
+    fields: [
+      ["label", "Goal", "text", true],
+      ["horizon", "Time horizon", "select", false, ["now","3_months","1_year","3_years"]],
+      ["status", "Status", "select", false, ["active","paused","complete"]],
+      ["note", "Why this matters", "textarea", false],
+    ],
+  },
 };
 
 function esc(value) {
@@ -133,6 +256,7 @@ async function api(path, options = {}) {
 
 function showToast(message) {
   const toast = $("toast");
+  if (!toast) return;
   toast.textContent = message;
   toast.classList.add("is-visible");
   clearTimeout(showToast.timer);
@@ -154,6 +278,11 @@ function salaryText(job) {
   return `${currency} ${min || max}/mo`;
 }
 
+function money(value, currency = "USD") {
+  if (value === null || value === undefined || value === "") return "—";
+  return `${currency} ${Math.round(Number(value)).toLocaleString()}`;
+}
+
 function companyInitials(company) {
   const words = String(company || "?").trim().split(/\s+/).filter(Boolean);
   if (!words.length) return "?";
@@ -166,14 +295,25 @@ function friendlyVerification(value) {
 
 function friendlyTime(value) {
   if (!value) return "—";
-  const date = new Date(value.includes("T") ? value : value.replace(" ", "T") + "Z");
-  if (Number.isNaN(date.getTime())) return String(value);
+  const raw = String(value);
+  const date = new Date(raw.includes("T") ? raw : raw.replace(" ", "T") + "Z");
+  if (Number.isNaN(date.getTime())) return raw;
   return date.toLocaleString([], {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function friendlyDate(value) {
+  if (!value) return { day: "—", rest: "Not scheduled" };
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { day: "—", rest: String(value) };
+  return {
+    day: String(date.getDate()).padStart(2, "0"),
+    rest: date.toLocaleString([], { month: "short", weekday: "short", hour: "2-digit", minute: "2-digit" }),
+  };
 }
 
 function animateNumber(element, next) {
@@ -209,7 +349,11 @@ function switchView(route) {
   $("page-eyebrow").textContent = eyebrow;
   $("page-title").textContent = title;
   closeCommandPalette();
-  window.scrollTo({ top: 0, behavior: document.body.classList.contains("reduce-motion") ? "auto" : "smooth" });
+  closeNotificationPanel();
+  window.scrollTo({
+    top: 0,
+    behavior: document.body.classList.contains("reduce-motion") ? "auto" : "smooth",
+  });
 }
 
 function renderWelcome() {
@@ -235,6 +379,13 @@ function renderStage(cycle) {
     failed: 100,
   };
   $("terminal-progress-bar").style.width = `${widths[stage] ?? 0}%`;
+  if ($("agent-pulse-text")) {
+    $("agent-pulse-text").textContent = cycle?.running
+      ? (stageLabels[stage] || "Working")
+      : cycle?.last_error
+        ? "Waiting for a fix"
+        : "Watching your career signals";
+  }
 }
 
 function renderStatus() {
@@ -256,14 +407,17 @@ function renderStatus() {
   $("quota-mini").textContent = `Searches · ${quotaText}`;
   $("quota-status").textContent = quotaText;
 
-  const mode = submission.auto_submit ? "Automatic" : "Supervised";
+  const effectiveSubmit = state.authority?.submit?.effective_auto_submit;
+  const mode = effectiveSubmit ? "Automatic" : submission.auto_submit ? "Permission blocked" : "Supervised";
   $("submission-status").textContent = mode;
   $("application-mode").textContent = mode;
-  $("sidebar-mode").textContent = submission.auto_submit ? "Auto apply on" : "Supervised mode";
-  $("sidebar-mode-detail").textContent = submission.auto_submit ? "Approved jobs may be sent" : "You stay in control";
+  $("sidebar-mode").textContent = effectiveSubmit ? "Auto apply on" : "Supervised mode";
+  $("sidebar-mode-detail").textContent = effectiveSubmit ? "Approved jobs may be sent" : "You stay in control";
   $("window-status").textContent = submission.window_open ? "Open" : "Paused";
   $("intake-status").textContent = intake?.enabled ? "On" : "Off";
-  $("cycle-status").textContent = cycle?.running ? (stageLabels[cycle.stage] || "Working") : (cycle?.last_error ? "Needs attention" : "Idle");
+  $("cycle-status").textContent = cycle?.running
+    ? (stageLabels[cycle.stage] || "Working")
+    : (cycle?.last_error ? "Needs attention" : "Idle");
 
   if (cycle?.running) {
     $("run-cycle-btn").disabled = true;
@@ -282,13 +436,35 @@ function renderStatus() {
   $("brain-headline").textContent = profile.headline || "—";
   $("brain-location").textContent = profile.location || "—";
   $("brain-remote").textContent = profile.remote_only ? "Remote work" : "Remote or on-site";
-  const targetPay = profile.target_monthly
+  $("brain-comp").textContent = profile.target_monthly
     ? `${profile.currency || "USD"} ${Math.round(profile.target_monthly).toLocaleString()}/month`
     : "Not set";
-  $("brain-comp").textContent = targetPay;
   $("brain-targets").innerHTML = (profile.target_titles || []).length
     ? profile.target_titles.map((title) => `<span class="tag">${esc(title)}</span>`).join("")
     : '<span class="tag">No target roles set</span>';
+}
+
+function renderMissions() {
+  const missions = state.missions || [];
+  if (!missions.length) return;
+  const lead = missions[0];
+  $("mission-lead").textContent = lead.title;
+  $("mission-copy").textContent = lead.detail;
+  $("mission-queue").innerHTML = missions.map((mission) => `
+    <button class="mission-chip" data-mission-action="${esc(mission.action)}" data-mission-job="${esc(mission.job_id || "")}">
+      ${icon(missionIcons[mission.kind] || "target")}
+      <span><strong>${esc(mission.title)}</strong><small>${esc(mission.detail)}</small></span>
+    </button>
+  `).join("");
+  $("mission-queue").querySelectorAll("[data-mission-action]").forEach((button) => {
+    button.addEventListener("click", () => runMission(button.dataset.missionAction, button.dataset.missionJob));
+  });
+}
+
+function runMission(action, jobId) {
+  if (action === "find_jobs") return runCycle();
+  if (action === "job" && jobId) return openJob(jobId);
+  if (routeMeta[action]) return switchView(action);
 }
 
 function renderSourceMix(sourceCounts) {
@@ -334,7 +510,6 @@ function filteredJobs() {
     if (state.filter === "saved" && !job.saved) return false;
     if (state.filter === "verified" && job.verification_state !== "live") return false;
     if (state.sourceFilter !== "all" && job.source !== state.sourceFilter) return false;
-
     const haystack = `${job.title} ${job.company} ${job.source} ${job.location || ""}`.toLowerCase();
     if (state.query && !haystack.includes(state.query.toLowerCase())) return false;
     return true;
@@ -346,17 +521,15 @@ function filteredJobs() {
     jobs.sort((a, b) => Number(b.salary_max_monthly || b.salary_min_monthly || 0) - Number(a.salary_max_monthly || a.salary_min_monthly || 0));
   } else {
     jobs.sort((a, b) => {
-      const decisionRank = { aggressive_pursuit: 0, high_priority: 1, apply: 2, watch: 3, low_priority: 4, ignore: 5 };
-      const rankA = decisionRank[a.decision] ?? 9;
-      const rankB = decisionRank[b.decision] ?? 9;
-      if (rankA !== rankB) return rankA - rankB;
-      return Number(b.interest_score || 0) - Number(a.interest_score || 0);
+      const rank = { aggressive_pursuit: 0, high_priority: 1, apply: 2, watch: 3, low_priority: 4, ignore: 5 };
+      const diff = (rank[a.decision] ?? 9) - (rank[b.decision] ?? 9);
+      return diff || Number(b.interest_score || 0) - Number(a.interest_score || 0);
     });
   }
   return jobs;
 }
 
-function jobCard(job, index = 0, compact = false) {
+function jobCard(job, index = 0) {
   const salary = salaryText(job);
   const decision = job.decision || "pending";
   const score = Number.isFinite(job.interest_score) ? job.interest_score : "—";
@@ -365,10 +538,10 @@ function jobCard(job, index = 0, compact = false) {
     salary,
     job.source,
   ].filter(Boolean);
-
   const verification = job.verification_state
     ? `<span class="verification-badge" data-state="${esc(job.verification_state)}">${esc(friendlyVerification(job.verification_state))}</span>`
     : "";
+  const compared = state.compareIds.includes(job.id);
 
   return `
     <article class="job-card" data-job-id="${esc(job.id)}" style="--i:${Math.min(index, 14)}">
@@ -386,9 +559,8 @@ function jobCard(job, index = 0, compact = false) {
       <div class="job-side">
         <div class="job-score"><strong>${esc(score)}</strong><small>match</small></div>
         <div class="decision-badge" data-tone="${decisionTone(decision)}">${esc(decisionLabels[decision] || decision)}</div>
-        <button class="job-save ${job.saved ? "is-saved" : ""}" data-save-job="${esc(job.id)}" aria-label="${job.saved ? "Remove saved job" : "Save job"}" title="${job.saved ? "Remove saved job" : "Save job"}">
-          ${icon("bookmark")}
-        </button>
+        <button class="job-save ${compared ? "is-saved" : ""}" data-compare-job="${esc(job.id)}" aria-label="Compare job" title="Compare job">${icon("compare")}</button>
+        <button class="job-save ${job.saved ? "is-saved" : ""}" data-save-job="${esc(job.id)}" aria-label="${job.saved ? "Remove saved job" : "Save job"}" title="${job.saved ? "Remove saved job" : "Save job"}">${icon("bookmark")}</button>
       </div>
     </article>
   `;
@@ -397,7 +569,7 @@ function jobCard(job, index = 0, compact = false) {
 function attachJobCardEvents(container) {
   container.querySelectorAll(".job-card").forEach((card) => {
     card.addEventListener("click", (event) => {
-      if (event.target.closest("[data-save-job]")) return;
+      if (event.target.closest("[data-save-job], [data-compare-job]")) return;
       openJob(card.dataset.jobId);
     });
   });
@@ -408,6 +580,12 @@ function attachJobCardEvents(container) {
       if (job) await setJobPreference(job.id, { saved: !job.saved }, { quiet: true });
     });
   });
+  container.querySelectorAll("[data-compare-job]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleCompare(button.dataset.compareJob);
+    });
+  });
 }
 
 function renderJobs() {
@@ -416,7 +594,6 @@ function renderJobs() {
   $("results-summary").textContent = jobs.length
     ? `${jobs.length} suitable job${jobs.length === 1 ? "" : "s"} shown`
     : "No jobs match these filters.";
-
   $("jobs-list").innerHTML = jobs.length
     ? jobs.map((job, index) => jobCard(job, index)).join("")
     : '<div class="empty-state">No suitable jobs match this view.</div>';
@@ -427,7 +604,7 @@ function renderJobs() {
     .sort((a, b) => Number(b.interest_score || 0) - Number(a.interest_score || 0))
     .slice(0, 6);
   $("priority-list").innerHTML = priority.length
-    ? priority.map((job, index) => jobCard(job, index, true)).join("")
+    ? priority.map((job, index) => jobCard(job, index)).join("")
     : '<div class="empty-state">No strong matches yet. Run a job search to get started.</div>';
   attachJobCardEvents($("priority-list"));
 }
@@ -465,13 +642,7 @@ function renderAttention() {
           </article>
         `;
       }).join("")
-    : `
-      <div class="empty-state success-empty">
-        ${icon("check")}
-        <strong>You are clear.</strong>
-        <span>Nothing needs your attention right now.</span>
-      </div>
-    `;
+    : `<div class="empty-state success-empty">${icon("check")}<strong>You are clear.</strong><span>Nothing needs your attention right now.</span></div>`;
 
   document.querySelectorAll("[data-attention-job]").forEach((button) => {
     button.addEventListener("click", () => openJob(button.dataset.attentionJob));
@@ -492,7 +663,6 @@ function renderApplications() {
         `;
       }).join("")
     : '<div class="empty-state">No applications prepared yet.</div>';
-
   document.querySelectorAll("[data-application-job]").forEach((row) => {
     row.addEventListener("click", () => openJob(row.dataset.applicationJob));
   });
@@ -502,7 +672,7 @@ function renderActivity() {
   $("activity-list").innerHTML = state.activity.length
     ? state.activity.map((item) => {
         const label = activityLabels[item.event_type] || item.event_type.replaceAll("_", " ");
-        const detail = item.payload?.reason || item.payload?.error || item.payload?.source || "";
+        const detail = item.payload?.reason || item.payload?.error || item.payload?.source || item.payload?.company || "";
         return `
           <div class="activity-row">
             <span class="activity-time">${esc(friendlyTime(item.created_at))}</span>
@@ -515,32 +685,259 @@ function renderActivity() {
     : '<div class="empty-state">Nothing to show yet.</div>';
 }
 
+function renderCompanies() {
+  const watched = state.companies.filter((item) => item.watching);
+  const card = (item) => `
+    <article class="company-card">
+      <div class="company-seal">${esc(companyInitials(item.company))}</div>
+      <div>
+        <h3>${esc(item.company)}</h3>
+        <p>${esc(item.signal === "active" ? "Several strong roles have appeared" : item.signal === "interesting" ? "At least one strong role found" : "Seen in your job search")}</p>
+        <div class="company-stats">
+          <span><strong>${item.jobs}</strong> jobs</span>
+          <span><strong>${item.strong_jobs}</strong> strong</span>
+          <span><strong>${item.best_score || "—"}</strong> best match</span>
+        </div>
+      </div>
+      <button class="watch-button ${item.watching ? "is-watching" : ""}" data-watch-company="${esc(item.company)}" title="${item.watching ? "Stop watching" : "Watch company"}">${icon("bookmark")}</button>
+    </article>
+  `;
+  $("watched-companies").innerHTML = watched.length
+    ? watched.map(card).join("")
+    : '<div class="empty-state small-empty">No companies on your watchlist yet.</div>';
+  $("companies-list").innerHTML = state.companies.length
+    ? state.companies.map(card).join("")
+    : '<div class="empty-state">No company data yet.</div>';
+
+  document.querySelectorAll("[data-watch-company]").forEach((button) => {
+    button.addEventListener("click", () => toggleCompanyWatch(button.dataset.watchCompany));
+  });
+}
+
+async function toggleCompanyWatch(company) {
+  const item = state.companies.find((row) => row.company === company);
+  if (!item) return;
+  try {
+    const result = await api("/api/companies/watch", {
+      method: "POST",
+      body: JSON.stringify({ company, watching: !item.watching }),
+    });
+    item.watching = result.watching;
+    renderCompanies();
+    showToast(result.watching ? "Company added to your watchlist." : "Company removed from your watchlist.");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function renderContacts() {
+  $("contacts-count").textContent = state.contacts.length;
+  $("contacts-list").innerHTML = state.contacts.length
+    ? state.contacts.map((item) => `
+      <div class="contact-row">
+        <span class="contact-avatar">${esc(companyInitials(item.name))}</span>
+        <span><strong>${esc(item.name)}</strong><small>${esc([item.role,item.company].filter(Boolean).join(" · ") || "Career contact")}</small></span>
+        <span class="relationship-pill">${esc((item.relationship || "new").replaceAll("_"," "))}</span>
+      </div>
+    `).join("")
+    : '<div class="empty-state">No contacts yet. Add a recruiter, hiring manager or useful career contact.</div>';
+}
+
+async function analyzeRecruiterMessage() {
+  const message = $("recruiter-message").value.trim();
+  if (!message) return showToast("Paste the recruiter message first.");
+  $("analyze-message-btn").disabled = true;
+  try {
+    const result = await api("/api/recruiter/advice", {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    });
+    $("recruiter-advice").innerHTML = `
+      <div class="negotiation-line"><span>What it means</span><strong>${esc(result.intent)}</strong></div>
+      <div class="negotiation-line"><span>What to do</span><strong>${esc(result.recommended_action)}</strong></div>
+      <div class="negotiation-line"><span>Suggested reply</span><strong>${esc(result.draft_reply)}</strong></div>
+    `;
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    $("analyze-message-btn").disabled = false;
+  }
+}
+
+function renderInterviews() {
+  $("interviews-list").innerHTML = state.interviews.length
+    ? state.interviews.map((item) => {
+        const date = friendlyDate(item.scheduled_at);
+        return `
+          <article class="interview-card">
+            <div class="interview-date"><strong>${esc(date.day)}</strong><span>${esc(date.rest)}</span></div>
+            <h3>${esc(item.title)}</h3>
+            <p>${esc(item.company)}</p>
+            <div class="interview-meta">
+              <span>${esc(item.status || "planned")}</span>
+              ${item.format ? `<span>${esc(item.format)}</span>` : ""}
+            </div>
+            ${item.note ? `<p style="margin-top:12px">${esc(item.note)}</p>` : ""}
+          </article>
+        `;
+      }).join("")
+    : '<div class="empty-state">No interviews saved yet.</div>';
+}
+
+function renderOffers() {
+  $("offers-list").innerHTML = state.offers.length
+    ? state.offers.map((item) => `
+      <article class="offer-card" data-offer-id="${esc(item.id)}">
+        <div>
+          <h3>${esc(item.title)}</h3>
+          <p>${esc(item.company)}</p>
+          <div class="offer-actions">
+            <button class="button button-secondary" data-review-offer="${esc(item.id)}">Review offer</button>
+          </div>
+        </div>
+        <div class="offer-pay">
+          <strong>${esc(money(item.monthly_base, item.currency))}</strong>
+          <span>monthly base</span>
+          <span style="margin-top:7px">${esc(item.status || "reviewing")}</span>
+        </div>
+      </article>
+    `).join("")
+    : '<div class="empty-state">No offers saved yet.</div>';
+
+  document.querySelectorAll("[data-review-offer]").forEach((button) => {
+    button.addEventListener("click", () => reviewOffer(button.dataset.reviewOffer));
+  });
+}
+
+async function reviewOffer(offerId) {
+  const offer = state.offers.find((item) => item.id === offerId);
+  if (!offer) return;
+  state.selectedOffer = offer;
+  $("negotiation-desk").innerHTML = `
+    <div class="desk-handle"></div>
+    <div class="eyebrow">NEGOTIATION DESK</div>
+    <h3>${esc(offer.company)} · ${esc(offer.title)}</h3>
+    <p>Reviewing ${esc(money(offer.monthly_base, offer.currency))} monthly base.</p>
+    <div id="offer-advice-result"><div class="negotiation-line"><span>Status</span><strong>Building a negotiation view…</strong></div></div>
+  `;
+  try {
+    const advice = await api(`/api/offers/${encodeURIComponent(offerId)}/advice`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    $("offer-advice-result").innerHTML = `
+      <div class="negotiation-line"><span>Leverage</span><strong>${esc((advice.leverage || "unknown").replaceAll("_"," "))}</strong></div>
+      <div class="negotiation-line"><span>Suggested counter</span><strong>${esc(advice.recommended_counter_monthly ? money(advice.recommended_counter_monthly, offer.currency) : "Ask for the approved range first")}</strong></div>
+      <div class="negotiation-line"><span>Walk-away line</span><strong>${esc(advice.walk_away_below_monthly ? money(advice.walk_away_below_monthly, offer.currency) : "Not set")}</strong></div>
+      <div class="negotiation-line"><span>Strategy</span><strong>${esc((advice.strategy || []).join(" "))}</strong></div>
+    `;
+  } catch (error) {
+    $("offer-advice-result").innerHTML = `<div class="negotiation-line"><span>Problem</span><strong>${esc(error.message)}</strong></div>`;
+  }
+}
+
+function renderInsights() {
+  const insights = state.insights;
+  if (!insights) return;
+
+  const funnel = insights.funnel || {};
+  const funnelPairs = [
+    ["Found", funnel.found],
+    ["Reviewed", funnel.reviewed],
+    ["Worth pursuing", funnel.worth_pursuing],
+    ["Applied", funnel.applications],
+    ["Interviews", funnel.interviews],
+    ["Offers", funnel.offers],
+  ];
+  const maxFunnel = Math.max(1, ...funnelPairs.map(([,value]) => Number(value || 0)));
+  $("funnel-story").innerHTML = `
+    <div class="story-title">Your opportunity funnel</div>
+    <div class="story-copy">Where your job search is creating movement — and where it may be slowing down.</div>
+    <div class="funnel-line">
+      ${funnelPairs.map(([label,value]) => `
+        <div class="funnel-step">
+          <div class="funnel-bar" style="height:${Math.max(3, Math.round((Number(value || 0)/maxFunnel)*70))}px"></div>
+          <strong>${Number(value || 0)}</strong><span>${esc(label)}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+
+  const salary = insights.salary || {};
+  const strongSalary = salary.strong_jobs || {};
+  $("salary-story").innerHTML = `
+    <div class="story-title">Pay evidence from your own matches</div>
+    <div class="story-copy">${esc(salary.note || "")}</div>
+    <div class="salary-big">${esc(strongSalary.median ? money(strongSalary.median, salary.currency) : "Not enough data")}</div>
+    <div class="salary-range">${strongSalary.low ? `Typical stored range: ${esc(money(strongSalary.low, salary.currency))} – ${esc(money(strongSalary.high, salary.currency))}/month` : "Salary data will improve as more matching jobs include pay."}</div>
+  `;
+
+  $("source-performance").innerHTML = (insights.sources || []).slice(0,8).map((item) => `
+    <div class="insight-row"><span><strong>${esc(item.source)}</strong><small>${item.jobs} jobs · ${item.strong} strong</small></span><span class="insight-value">${esc(item.strong_rate)}% useful</span></div>
+  `).join("") || '<div class="empty-state small-empty">Not enough source data yet.</div>';
+
+  $("role-trends").innerHTML = (insights.roles || []).slice(0,8).map((item) => `
+    <div class="insight-row"><span><strong>${esc(item.family)}</strong><small>${item.jobs} jobs seen</small></span><span class="insight-value">${item.average_match ?? "—"} avg match</span></div>
+  `).join("") || '<div class="empty-state small-empty">Not enough role data yet.</div>';
+
+  $("gap-signals").innerHTML = (insights.gaps || []).slice(0,8).map((item) => `
+    <div class="insight-row"><span><strong>${esc(item.gap)}</strong><small>${esc((item.examples || []).join(" · "))}</small></span><span class="insight-value">${item.jobs} jobs</span></div>
+  `).join("") || '<div class="empty-state small-empty">No repeated gaps found in strong jobs yet.</div>';
+
+  const evidence = insights.evidence || {};
+  $("evidence-health").innerHTML = `
+    <div class="insight-row"><span><strong>Active evidence</strong><small>Records, artifacts and supported facts</small></span><span class="insight-value">${evidence.evidence_total || 0}</span></div>
+    <div class="insight-row"><span><strong>Capabilities</strong><small>Skills in the Career Brain</small></span><span class="insight-value">${evidence.capabilities_total || 0}</span></div>
+    <div class="insight-row"><span><strong>Capabilities with evidence</strong><small>Directly linked to proof</small></span><span class="insight-value">${evidence.capabilities_with_evidence || 0}</span></div>
+    <div class="insight-row"><span><strong>Experience records</strong><small>Structured career history</small></span><span class="insight-value">${evidence.experience_entries || 0}</span></div>
+  `;
+}
+
 function renderReadiness() {
   if (!state.readiness) return;
   const { checks, ready_count, total, answer_bank, application_sites } = state.readiness;
   const percent = total ? Math.round((ready_count / total) * 100) : 0;
   $("readiness-percent").textContent = `${percent}%`;
   $("readiness-ring").style.setProperty("--readiness", `${percent}%`);
-
   $("readiness-list").innerHTML = checks.map((check) => `
     <div class="readiness-item ${check.ready ? "" : "not-ready"}">
       <span class="readiness-icon">${icon(check.ready ? "check" : "info")}</span>
       <span><strong>${esc(check.label)}</strong><small>${esc(check.detail)}</small></span>
     </div>
   `).join("");
-
   $("answers-total").textContent = answer_bank.total || 0;
   $("answers-verified").textContent = answer_bank.verified || 0;
   $("answers-auto").textContent = answer_bank.automatic || 0;
-
   $("site-capability-list").innerHTML = application_sites.map((site) => `
     <div class="site-capability">
       <strong>${esc(site.name)}</strong>
-      <span class="capability-pill ${site.level === "check_only" ? "check-only" : ""}">
-        ${site.level === "check_only" ? "Can check only" : "Can fill + submit"}
-      </span>
+      <span class="capability-pill ${site.level === "check_only" ? "check-only" : ""}">${site.level === "check_only" ? "Can check only" : "Can fill + submit"}</span>
     </div>
   `).join("");
+}
+
+function renderGoals() {
+  $("goals-list").innerHTML = state.goals.length
+    ? state.goals.map((goal) => `
+      <div class="goal-row">
+        <span class="goal-marker"></span>
+        <span><strong>${esc(goal.label)}</strong><small>${esc(goal.note || "Career direction")}</small></span>
+        <span class="goal-horizon">${esc((goal.horizon || "now").replaceAll("_"," "))}</span>
+      </div>
+    `).join("")
+    : '<div class="empty-state small-empty">No explicit career goals saved yet.</div>';
+}
+
+function renderEvidence() {
+  const evidence = state.evidence || {};
+  const total = Number(evidence.capabilities_total || 0);
+  const linked = Number(evidence.capabilities_with_evidence || 0);
+  const percent = total ? Math.round((linked / total) * 100) : 0;
+  $("evidence-summary").innerHTML = `
+    <div class="evidence-score"><strong>${percent}%</strong><span>of capabilities linked to evidence</span></div>
+    <div class="evidence-meter"><i style="width:${percent}%"></i></div>
+    <p>${evidence.evidence_total || 0} active evidence items · ${evidence.experience_entries || 0} structured experience records. Jobster prefers proof over confident-sounding claims.</p>
+  `;
 }
 
 function formatPay(value, currency) {
@@ -557,7 +954,6 @@ function renderSettings() {
   const search = state.settings.job_search;
   const relevance = state.settings.relevance_filter;
   const applications = state.settings.applications;
-
   $("settings-search").innerHTML = [
     settingsRow("Target roles", (search.target_titles || []).join(", ") || "Not set"),
     settingsRow("Work style", search.remote_only ? "Remote only" : "Remote or on-site"),
@@ -566,44 +962,145 @@ function renderSettings() {
     settingsRow("Relevant job filter", relevance.enabled ? "On" : "Off"),
     settingsRow("Jobs allowed from one source", String(relevance.max_per_source)),
   ].join("");
-
   $("settings-apps").innerHTML = [
-    settingsRow("Auto apply", applications.auto_apply ? "On" : "Off"),
+    settingsRow("Config auto apply", applications.auto_apply ? "On" : "Off"),
     settingsRow("Max applications per search", String(applications.max_per_search)),
     settingsRow("Friday stop", `${applications.friday_stop} (${applications.timezone})`),
     settingsRow("Monday resume", `${applications.monday_resume} (${applications.timezone})`),
   ].join("");
+  renderAuthority();
+}
+
+function renderAuthority() {
+  const entries = Object.entries(state.authority || {}).filter(([key]) => authorityCopy[key]);
+  $("authority-grid").innerHTML = entries.map(([key,value]) => {
+    const [label, copy, iconName] = authorityCopy[key];
+    const mode = !value.enabled ? "off" : value.requires_approval ? "ask" : "auto";
+    return `
+      <article class="authority-card">
+        <span class="principle-icon cobalt">${icon(iconName)}</span>
+        <h4>${esc(label)}</h4>
+        <p>${esc(copy)}</p>
+        <div class="authority-state">
+          <button class="${mode === "off" ? "is-active" : ""}" data-authority="${key}" data-mode="off">Off</button>
+          <button class="${mode === "ask" ? "is-active" : ""}" data-authority="${key}" data-mode="ask">Ask</button>
+          <button class="${mode === "auto" ? "is-active auto-active" : ""}" data-authority="${key}" data-mode="auto">Auto</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  $("authority-grid").querySelectorAll("[data-authority]").forEach((button) => {
+    button.addEventListener("click", () => updateAuthority(button.dataset.authority, button.dataset.mode));
+  });
+}
+
+async function updateAuthority(action, mode) {
+  const payload = {
+    enabled: mode !== "off",
+    requires_approval: mode !== "auto",
+  };
+  if (action === "submit" && mode === "auto" && !state.status?.submission?.auto_submit) {
+    showToast("Auto-submit is still off in your private search settings. This permission alone will not submit jobs.");
+  }
+  try {
+    await api(`/api/authority/${encodeURIComponent(action)}`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    state.authority = await api("/api/authority");
+    renderAuthority();
+    renderStatus();
+    showToast(`${authorityCopy[action][0]} updated.`);
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function renderNotifications() {
+  const unread = state.notifications.filter((item) => !item.is_read);
+  $("notification-dot").classList.toggle("is-visible", unread.length > 0);
+  $("notification-list").innerHTML = state.notifications.length
+    ? state.notifications.map((item) => `
+      <button class="notification-item" data-notification-id="${item.id}" data-notification-job="${esc(item.job_id || "")}">
+        <span class="notification-icon">${icon(item.kind === "warning" ? "alert" : item.kind === "success" ? "check" : "bell")}</span>
+        <span><strong>${esc(item.title)}</strong><p>${esc(item.body)}</p></span>
+      </button>
+    `).join("")
+    : '<div class="empty-state small-empty">No notifications yet.</div>';
+  $("notification-list").querySelectorAll("[data-notification-id]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const id = Number(button.dataset.notificationId);
+      await api(`/api/notifications/${id}/read`, { method: "POST", body: JSON.stringify({is_read:true}) });
+      const jobId = button.dataset.notificationJob;
+      if (jobId) openJob(jobId);
+      state.notifications = state.notifications.map((item) => item.id === id ? {...item,is_read:true} : item);
+      renderNotifications();
+    });
+  });
+}
+
+function openNotificationPanel() {
+  $("notification-panel").classList.add("is-visible");
+  $("notification-panel").setAttribute("aria-hidden","false");
+}
+function closeNotificationPanel() {
+  $("notification-panel").classList.remove("is-visible");
+  $("notification-panel").setAttribute("aria-hidden","true");
 }
 
 function renderAll() {
   renderStatus();
+  renderMissions();
   renderSourceOptions();
   renderJobs();
   renderAttention();
   renderApplications();
+  renderCompanies();
+  renderContacts();
+  renderInterviews();
+  renderOffers();
+  renderInsights();
   renderActivity();
   renderReadiness();
+  renderGoals();
+  renderEvidence();
   renderSettings();
+  renderNotifications();
+  renderCompareTray();
 }
 
 async function loadAll({ quiet = false } = {}) {
   try {
-    const [status, jobs, applications, activity, attention, readiness, settings] = await Promise.all([
+    const [
+      status, jobs, applications, activity, attention, readiness, settings,
+      missions, insights, evidence, companies, contacts, interviews, offers,
+      authority, notifications, goals, feedback,
+    ] = await Promise.all([
       api("/api/status"),
       api("/api/jobs?limit=300"),
       api("/api/applications?limit=200"),
-      api("/api/activity?limit=150"),
+      api("/api/activity?limit=200"),
       api("/api/attention?limit=150"),
       api("/api/readiness"),
       api("/api/settings"),
+      api("/api/missions"),
+      api("/api/insights"),
+      api("/api/evidence"),
+      api("/api/companies?limit=250"),
+      api("/api/contacts?limit=300"),
+      api("/api/interviews?limit=200"),
+      api("/api/offers?limit=100"),
+      api("/api/authority"),
+      api("/api/notifications?limit=100"),
+      api("/api/goals?limit=100"),
+      api("/api/feedback?limit=150"),
     ]);
-    state.status = status;
-    state.jobs = jobs;
-    state.applications = applications;
-    state.activity = activity;
-    state.attention = attention;
-    state.readiness = readiness;
-    state.settings = settings;
+    Object.assign(state, {
+      status, jobs, applications, activity, attention, readiness, settings,
+      missions, insights, evidence, companies, contacts, interviews, offers,
+      authority, notifications, goals, feedback,
+    });
     renderAll();
   } catch (error) {
     if (!quiet) showToast(error.message);
@@ -657,7 +1154,7 @@ async function openJob(jobId) {
   try {
     const bundle = await api(`/api/jobs/${encodeURIComponent(jobId)}`);
     state.selectedJob = bundle;
-    const { job, evaluation = {}, application, verification, preference = {} } = bundle;
+    const { job, evaluation = {}, application, verification } = bundle;
 
     $("drawer-source").textContent = (job.source || "Opportunity").toUpperCase();
     $("drawer-title").textContent = job.title;
@@ -665,7 +1162,6 @@ async function openJob(jobId) {
     $("drawer-score").textContent = Number.isFinite(evaluation?.interest_score) ? evaluation.interest_score : "—";
     $("drawer-decision").textContent = decisionLabels[evaluation?.pursuit_decision] || evaluation?.pursuit_decision || "Pending";
     $("drawer-decision").dataset.tone = decisionTone(evaluation?.pursuit_decision);
-
     $("drawer-summary").textContent = evaluation?.summary || evaluation?.role_interpretation || "Jobster has not reviewed this job yet.";
     $("drawer-next").textContent = evaluation?.next_action || "Review this job first.";
 
@@ -689,6 +1185,7 @@ async function openJob(jobId) {
     $("open-job-btn").disabled = !job.url;
     $("verify-job-btn").disabled = !job.url;
     $("prepare-job-btn").disabled = !evaluation;
+    $("compare-job-btn").classList.toggle("is-active", state.compareIds.includes(job.id));
     $("drawer-note").textContent = application
       ? `Application: ${pipelineLabels[application.state] || application.state}. ${(application.reasons || []).join(" ")}`
       : "No application has been prepared for this job yet.";
@@ -705,6 +1202,21 @@ function closeDrawer() {
   $("drawer-backdrop").classList.remove("is-visible");
   $("job-drawer").classList.remove("is-visible");
   $("job-drawer").setAttribute("aria-hidden", "true");
+}
+
+async function addFeedback(reaction) {
+  const jobId = state.selectedJob?.job?.id;
+  if (!jobId) return;
+  try {
+    const result = await api("/api/feedback", {
+      method: "POST",
+      body: JSON.stringify({ job_id: jobId, reaction }),
+    });
+    state.feedback.unshift(result);
+    showToast("Feedback saved. Jobster will keep it as evidence, not silently rewrite your preferences.");
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
 async function verifySelectedJob() {
@@ -729,6 +1241,9 @@ async function verifySelectedJob() {
 async function prepareSelectedJob() {
   const jobId = state.selectedJob?.job?.id;
   if (!jobId) return;
+  if (state.authority?.prepare && !state.authority.prepare.enabled) {
+    return showToast("Application preparation is turned off in the Authority Center.");
+  }
   try {
     $("prepare-job-btn").disabled = true;
     $("prepare-job-btn").innerHTML = `${icon("briefcase")}<span>Preparing…</span>`;
@@ -746,16 +1261,127 @@ async function prepareSelectedJob() {
   }
 }
 
+function toggleCompare(jobId) {
+  if (state.compareIds.includes(jobId)) {
+    state.compareIds = state.compareIds.filter((id) => id !== jobId);
+  } else {
+    if (state.compareIds.length >= 4) return showToast("You can compare up to four jobs at once.");
+    state.compareIds.push(jobId);
+  }
+  renderCompareTray();
+  renderJobs();
+  if (state.selectedJob?.job?.id === jobId) {
+    $("compare-job-btn").classList.toggle("is-active", state.compareIds.includes(jobId));
+  }
+}
+
+function renderCompareTray() {
+  const jobs = state.compareIds.map((id) => state.jobs.find((job) => job.id === id)).filter(Boolean);
+  $("compare-count").textContent = jobs.length;
+  $("compare-chips").innerHTML = jobs.map((job) => `<span class="compare-chip">${esc(job.title)} · ${esc(job.company)}</span>`).join("");
+  $("compare-tray").classList.toggle("is-visible", jobs.length > 0);
+  $("open-compare-btn").disabled = jobs.length < 2;
+}
+
+function openCompareModal() {
+  const jobs = state.compareIds.map((id) => state.jobs.find((job) => job.id === id)).filter(Boolean);
+  if (jobs.length < 2) return showToast("Select at least two jobs.");
+  const rows = [
+    ["Company", (job) => job.company],
+    ["Match", (job) => Number.isFinite(job.interest_score) ? `${job.interest_score}/100` : "—"],
+    ["Decision", (job) => decisionLabels[job.decision] || job.decision || "—"],
+    ["Location", (job) => job.location || (job.remote ? "Remote" : "—")],
+    ["Salary", (job) => salaryText(job) || "Not listed"],
+    ["Source", (job) => job.source || "—"],
+    ["Live check", (job) => friendlyVerification(job.verification_state)],
+    ["Application", (job) => pipelineLabels[job.application_state] || job.application_state || "Not prepared"],
+  ];
+  $("compare-table-wrap").innerHTML = `
+    <div class="compare-grid" style="--compare-cols:${jobs.length}">
+      <div class="compare-cell label">Role</div>
+      ${jobs.map((job) => `<div class="compare-cell head"><strong>${esc(job.title)}</strong><small>${esc(job.company)}</small></div>`).join("")}
+      ${rows.map(([label,getter]) => `
+        <div class="compare-cell label">${esc(label)}</div>
+        ${jobs.map((job) => `<div class="compare-cell">${esc(getter(job))}</div>`).join("")}
+      `).join("")}
+    </div>
+  `;
+  $("modal-backdrop").classList.add("is-visible");
+  $("compare-modal").classList.add("is-visible");
+  $("compare-modal").setAttribute("aria-hidden","false");
+}
+
+function closeCompareModal() {
+  $("compare-modal").classList.remove("is-visible");
+  $("compare-modal").setAttribute("aria-hidden","true");
+  if (!$("entity-modal").classList.contains("is-visible")) $("modal-backdrop").classList.remove("is-visible");
+}
+
+function openEntityModal(type) {
+  const schema = modalSchemas[type];
+  if (!schema) return;
+  $("entity-modal").dataset.type = type;
+  $("entity-modal-kicker").textContent = schema.kicker;
+  $("entity-modal-title").textContent = schema.title;
+  $("entity-form").innerHTML = `
+    <div class="form-grid">
+      ${schema.fields.map(([name,label,inputType,required,options,defaultValue]) => {
+        const full = inputType === "textarea" ? "full" : "";
+        let field = "";
+        if (inputType === "textarea") {
+          field = `<textarea name="${name}" ${required ? "required" : ""}></textarea>`;
+        } else if (inputType === "select") {
+          field = `<select name="${name}" ${required ? "required" : ""}>${(options || []).map((value) => `<option value="${esc(value)}">${esc(value.replaceAll("_"," "))}</option>`).join("")}</select>`;
+        } else {
+          field = `<input name="${name}" type="${inputType}" value="${esc(defaultValue || "")}" ${required ? "required" : ""} />`;
+        }
+        return `<label class="form-field ${full}"><span>${esc(label)}${required ? " *" : ""}</span>${field}</label>`;
+      }).join("")}
+    </div>
+    <div class="form-submit-row">
+      <button type="button" class="button button-secondary" data-close-entity>Cancel</button>
+      <button type="submit" class="button button-primary">Save</button>
+    </div>
+  `;
+  $("entity-form").querySelector("[data-close-entity]").addEventListener("click", closeEntityModal);
+  $("modal-backdrop").classList.add("is-visible");
+  $("entity-modal").classList.add("is-visible");
+  $("entity-modal").setAttribute("aria-hidden","false");
+  setTimeout(() => $("entity-form").querySelector("input,textarea,select")?.focus(), 40);
+}
+
+function closeEntityModal() {
+  $("entity-modal").classList.remove("is-visible");
+  $("entity-modal").setAttribute("aria-hidden","true");
+  if (!$("compare-modal").classList.contains("is-visible")) $("modal-backdrop").classList.remove("is-visible");
+}
+
+async function submitEntityForm(event) {
+  event.preventDefault();
+  const type = $("entity-modal").dataset.type;
+  const schema = modalSchemas[type];
+  if (!schema) return;
+  const formData = new FormData(event.currentTarget);
+  const payload = Object.fromEntries(formData.entries());
+  try {
+    await api(schema.endpoint, { method: "POST", body: JSON.stringify(payload) });
+    closeEntityModal();
+    showToast(`${schema.title.replace("Add ","")} saved.`);
+    await loadAll({ quiet: true });
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
 async function runCycle() {
+  if (state.authority?.search && !state.authority.search.enabled) {
+    return showToast("Job search is turned off in the Authority Center.");
+  }
   try {
     if (localStorage.getItem("jobster-pref-terminal") !== "0") terminalShow();
     $("run-cycle-btn").disabled = true;
     const result = await api("/api/cycles", { method: "POST" });
-    if (!result.started) {
-      showToast("A job search is already running.");
-    } else {
-      showToast("Job search started.");
-    }
+    showToast(result.started ? "Job search started." : "A job search is already running.");
     await pollCycle();
   } catch (error) {
     showToast(error.message);
@@ -769,7 +1395,6 @@ async function pollCycle() {
     if (state.status) state.status.cycle = cycle;
     renderStatus();
     await pollTerminal();
-
     if (cycle.running) {
       setTimeout(pollCycle, 1400);
       return;
@@ -791,7 +1416,6 @@ function terminalShow() {
   $("terminal-reopen").classList.remove("is-visible");
   localStorage.setItem("jobster-terminal-hidden", "0");
 }
-
 function terminalHide() {
   $("terminal-window").classList.add("is-hidden");
   $("terminal-reopen").classList.add("is-visible");
@@ -807,15 +1431,10 @@ function appendTerminalEvent(item) {
   const stamp = new Date(item.timestamp);
   const time = Number.isNaN(stamp.getTime()) ? "--:--:--" : stamp.toLocaleTimeString([], { hour12: false });
   const label = terminalLabels[item.event] || item.event.replaceAll("_", " ");
-  line.innerHTML = `
-    <span class="time">${esc(time)}</span>
-    <span class="event">${esc(label)}</span>
-    <span class="message">${esc(item.message)}</span>
-  `;
+  line.innerHTML = `<span class="time">${esc(time)}</span><span class="event">${esc(label)}</span><span class="message">${esc(item.message)}</span>`;
   body.appendChild(line);
   while (body.children.length > 180) body.removeChild(body.firstChild);
   body.scrollTop = body.scrollHeight;
-
   if (item.event === "evaluation_started" && item.payload?.total) {
     const progress = 48 + Math.round((item.payload.index / item.payload.total) * 37);
     $("terminal-progress-bar").style.width = `${Math.min(progress, 86)}%`;
@@ -834,7 +1453,6 @@ async function pollTerminal() {
     if (state.status) state.status.cycle = payload.cycle;
     renderStage(payload.cycle);
   } catch {
-    // The local server may be restarting. The next poll will try again.
   } finally {
     state.terminalPolling = false;
   }
@@ -844,7 +1462,6 @@ function setupTerminalWindow() {
   const terminal = $("terminal-window");
   const handle = $("terminal-handle");
   const minimize = $("terminal-minimize");
-
   if (localStorage.getItem("jobster-terminal-hidden") === "1") terminalHide();
 
   try {
@@ -870,7 +1487,6 @@ function setupTerminalWindow() {
     terminal.style.bottom = "auto";
     handle.setPointerCapture(event.pointerId);
   });
-
   handle.addEventListener("pointermove", (event) => {
     if (!drag) return;
     const rect = terminal.getBoundingClientRect();
@@ -879,21 +1495,16 @@ function setupTerminalWindow() {
     terminal.style.left = `${Math.max(8, Math.min(maxLeft, drag.left + event.clientX - drag.x))}px`;
     terminal.style.top = `${Math.max(8, Math.min(maxTop, drag.top + event.clientY - drag.y))}px`;
   });
-
   const saveRect = () => {
     if (!drag && terminal.classList.contains("is-hidden")) return;
     drag = null;
     const rect = terminal.getBoundingClientRect();
     localStorage.setItem("jobster-terminal-rect", JSON.stringify({
-      left: rect.left,
-      top: rect.top,
-      width: rect.width,
-      height: rect.height,
+      left: rect.left, top: rect.top, width: rect.width, height: rect.height,
     }));
   };
   handle.addEventListener("pointerup", saveRect);
   window.addEventListener("mouseup", saveRect);
-
   minimize.addEventListener("click", () => {
     terminal.classList.toggle("is-minimized");
     minimize.textContent = terminal.classList.contains("is-minimized") ? "□" : "—";
@@ -904,59 +1515,45 @@ function setupTerminalWindow() {
 
 function commandItems(query = "") {
   const q = query.trim().toLowerCase();
-  const pages = Object.entries(routeMeta).map(([route, [, title]]) => ({
-    type: "page",
-    id: route,
-    title,
-    subtitle: route === "today" ? "Career command center" : `Open ${title}`,
-    icon: route === "today" ? "home" :
-      route === "opportunities" ? "compass" :
-      route === "applications" ? "briefcase" :
-      route === "attention" ? "alert" :
-      route === "brain" ? "brain" :
-      route === "activity" ? "activity" : "settings",
+  const pages = Object.entries(routeMeta).map(([route,[,title]]) => ({
+    type: "page", id: route, title, subtitle: route === "today" ? "Career command center" : `Open ${title}`, icon: routeIcons[route],
   }));
   const actions = [
     { type: "action", id: "find", title: "Find jobs now", subtitle: "Start a new job search", icon: "play" },
     { type: "action", id: "terminal", title: "Open live job search", subtitle: "See what Jobster is doing", icon: "terminal" },
+    { type: "action", id: "export", title: "Export career data", subtitle: "Download your Jobster data as JSON", icon: "download" },
   ];
-  const jobs = state.jobs
-    .filter((job) => !job.dismissed)
-    .slice(0, 80)
-    .map((job) => ({
-      type: "job",
-      id: job.id,
-      title: job.title,
-      subtitle: job.company,
-      icon: "briefcase",
-    }));
-
-  const all = [...actions, ...pages, ...jobs];
-  if (!q) return all.slice(0, 16);
-  return all.filter((item) => `${item.title} ${item.subtitle}`.toLowerCase().includes(q)).slice(0, 20);
+  const jobs = state.jobs.filter((job) => !job.dismissed).slice(0,100).map((job) => ({
+    type: "job", id: job.id, title: job.title, subtitle: job.company, icon: "briefcase",
+  }));
+  const companies = state.companies.slice(0,50).map((company) => ({
+    type: "company", id: company.company, title: company.company, subtitle: `${company.jobs} jobs seen`, icon: "building",
+  }));
+  const all = [...actions,...pages,...jobs,...companies];
+  if (!q) return all.slice(0,18);
+  return all.filter((item) => `${item.title} ${item.subtitle}`.toLowerCase().includes(q)).slice(0,24);
 }
 
 function renderCommandResults() {
   const items = commandItems($("command-input").value);
   state.commandIndex = Math.max(0, Math.min(state.commandIndex, items.length - 1));
-  const pageItems = items.filter((item) => item.type !== "job");
-  const jobItems = items.filter((item) => item.type === "job");
-
+  const primary = items.filter((item) => !["job","company"].includes(item.type));
+  const jobs = items.filter((item) => item.type === "job");
+  const companies = items.filter((item) => item.type === "company");
   const group = (label, groupItems) => groupItems.length
     ? `<div class="command-section-label">${esc(label)}</div>${groupItems.map((item) => commandItemMarkup(item, items.indexOf(item))).join("")}`
     : "";
-
   $("command-results").innerHTML =
-    group("Actions and pages", pageItems) +
-    group("Jobs", jobItems) ||
+    group("Actions and pages",primary) +
+    group("Jobs",jobs) +
+    group("Companies",companies) ||
     '<div class="empty-state">No results.</div>';
-
   $("command-results").querySelectorAll(".command-item").forEach((button) => {
     button.addEventListener("click", () => runCommand(items[Number(button.dataset.commandIndex)]));
   });
 }
 
-function commandItemMarkup(item, index) {
+function commandItemMarkup(item,index) {
   return `
     <button class="command-item ${index === state.commandIndex ? "is-active" : ""}" data-command-index="${index}">
       <span class="command-item-icon">${icon(item.icon)}</span>
@@ -969,33 +1566,30 @@ function commandItemMarkup(item, index) {
 function openCommandPalette() {
   $("command-backdrop").classList.add("is-visible");
   $("command-palette").classList.add("is-visible");
-  $("command-palette").setAttribute("aria-hidden", "false");
+  $("command-palette").setAttribute("aria-hidden","false");
   $("command-input").value = "";
   state.commandIndex = 0;
   renderCommandResults();
-  setTimeout(() => $("command-input").focus(), 40);
+  setTimeout(() => $("command-input").focus(),40);
 }
-
 function closeCommandPalette() {
   $("command-backdrop").classList.remove("is-visible");
   $("command-palette").classList.remove("is-visible");
-  $("command-palette").setAttribute("aria-hidden", "true");
+  $("command-palette").setAttribute("aria-hidden","true");
 }
 
 function runCommand(item) {
   if (!item) return;
-  if (item.type === "page") switchView(item.id);
-  if (item.type === "action" && item.id === "find") {
+  if (item.type === "page") return switchView(item.id);
+  if (item.type === "action" && item.id === "find") { closeCommandPalette(); return runCycle(); }
+  if (item.type === "action" && item.id === "terminal") { closeCommandPalette(); return terminalShow(); }
+  if (item.type === "action" && item.id === "export") { closeCommandPalette(); window.location.href="/api/export"; return; }
+  if (item.type === "job") { closeCommandPalette(); return openJob(item.id); }
+  if (item.type === "company") {
     closeCommandPalette();
-    runCycle();
-  }
-  if (item.type === "action" && item.id === "terminal") {
-    closeCommandPalette();
-    terminalShow();
-  }
-  if (item.type === "job") {
-    closeCommandPalette();
-    openJob(item.id);
+    switchView("companies");
+    const card = [...document.querySelectorAll(".company-card")].find((node) => node.textContent.includes(item.id));
+    card?.scrollIntoView({behavior:"smooth",block:"center"});
   }
 }
 
@@ -1003,27 +1597,31 @@ function setupPreferences() {
   const reduceMotion = localStorage.getItem("jobster-pref-motion") === "1";
   const compact = localStorage.getItem("jobster-pref-compact") === "1";
   const terminalDefault = localStorage.getItem("jobster-pref-terminal") !== "0";
-
   $("pref-motion").checked = reduceMotion;
   $("pref-compact").checked = compact;
   $("pref-terminal").checked = terminalDefault;
-  document.body.classList.toggle("reduce-motion", reduceMotion);
-  document.body.classList.toggle("compact-list-mode", compact);
-
-  $("pref-motion").addEventListener("change", (event) => {
-    localStorage.setItem("jobster-pref-motion", event.target.checked ? "1" : "0");
-    document.body.classList.toggle("reduce-motion", event.target.checked);
+  document.body.classList.toggle("reduce-motion",reduceMotion);
+  document.body.classList.toggle("compact-list-mode",compact);
+  $("pref-motion").addEventListener("change",(event) => {
+    localStorage.setItem("jobster-pref-motion",event.target.checked ? "1":"0");
+    document.body.classList.toggle("reduce-motion",event.target.checked);
   });
-  $("pref-compact").addEventListener("change", (event) => {
-    localStorage.setItem("jobster-pref-compact", event.target.checked ? "1" : "0");
-    document.body.classList.toggle("compact-list-mode", event.target.checked);
+  $("pref-compact").addEventListener("change",(event) => {
+    localStorage.setItem("jobster-pref-compact",event.target.checked ? "1":"0");
+    document.body.classList.toggle("compact-list-mode",event.target.checked);
   });
-  $("pref-terminal").addEventListener("change", (event) => {
-    localStorage.setItem("jobster-pref-terminal", event.target.checked ? "1" : "0");
+  $("pref-terminal").addEventListener("change",(event) => {
+    localStorage.setItem("jobster-pref-terminal",event.target.checked ? "1":"0");
   });
 }
 
-document.addEventListener("click", (event) => {
+function registerServiceWorker() {
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("/service-worker.js").catch(() => null));
+  }
+}
+
+document.addEventListener("click",(event) => {
   const nav = event.target.closest("[data-route]");
   if (nav) switchView(nav.dataset.route);
 
@@ -1034,9 +1632,7 @@ document.addEventListener("click", (event) => {
   if (filterJump) {
     state.filter = filterJump.dataset.filterJump;
     switchView("opportunities");
-    document.querySelectorAll("[data-filter]").forEach((chip) => {
-      chip.classList.toggle("is-active", chip.dataset.filter === state.filter);
-    });
+    document.querySelectorAll("[data-filter]").forEach((chip) => chip.classList.toggle("is-active",chip.dataset.filter === state.filter));
     renderJobs();
   }
 
@@ -1050,65 +1646,78 @@ document.addEventListener("click", (event) => {
     chip.classList.add("is-active");
     renderJobs();
   }
+
+  const feedback = event.target.closest("[data-feedback]");
+  if (feedback) addFeedback(feedback.dataset.feedback);
 });
 
-$("job-search").addEventListener("input", (event) => {
-  state.query = event.target.value;
-  renderJobs();
-});
-$("source-filter").addEventListener("change", (event) => {
-  state.sourceFilter = event.target.value;
-  renderJobs();
-});
-$("sort-jobs").addEventListener("change", (event) => {
-  state.sort = event.target.value;
-  renderJobs();
-});
+$("job-search").addEventListener("input",(event) => { state.query = event.target.value; renderJobs(); });
+$("source-filter").addEventListener("change",(event) => { state.sourceFilter = event.target.value; renderJobs(); });
+$("sort-jobs").addEventListener("change",(event) => { state.sort = event.target.value; renderJobs(); });
 
-$("refresh-btn").addEventListener("click", () => loadAll());
-$("run-cycle-btn").addEventListener("click", runCycle);
-$("drawer-close").addEventListener("click", closeDrawer);
-$("drawer-backdrop").addEventListener("click", closeDrawer);
-$("verify-job-btn").addEventListener("click", verifySelectedJob);
-$("prepare-job-btn").addEventListener("click", prepareSelectedJob);
-$("open-job-btn").addEventListener("click", () => {
+$("refresh-btn").addEventListener("click",() => loadAll());
+$("run-cycle-btn").addEventListener("click",runCycle);
+$("drawer-close").addEventListener("click",closeDrawer);
+$("drawer-backdrop").addEventListener("click",closeDrawer);
+$("verify-job-btn").addEventListener("click",verifySelectedJob);
+$("prepare-job-btn").addEventListener("click",prepareSelectedJob);
+$("compare-job-btn").addEventListener("click",() => {
+  const id = state.selectedJob?.job?.id;
+  if (id) toggleCompare(id);
+});
+$("open-job-btn").addEventListener("click",() => {
   const url = state.selectedJob?.job?.url;
-  if (url) window.open(url, "_blank", "noopener,noreferrer");
+  if (url) window.open(url,"_blank","noopener,noreferrer");
 });
-$("drawer-save").addEventListener("click", async () => {
+$("drawer-save").addEventListener("click",async () => {
   const id = state.selectedJob?.job?.id;
   if (!id) return;
-  const saved = Boolean(state.selectedJob?.preference?.saved);
-  await setJobPreference(id, { saved: !saved });
+  await setJobPreference(id,{saved:!Boolean(state.selectedJob?.preference?.saved)});
 });
-$("save-note-btn").addEventListener("click", async () => {
+$("save-note-btn").addEventListener("click",async () => {
   const id = state.selectedJob?.job?.id;
-  if (!id) return;
-  await setJobPreference(id, { note: $("drawer-note-input").value });
+  if (id) await setJobPreference(id,{note:$("drawer-note-input").value});
 });
-$("dismiss-job-btn").addEventListener("click", async () => {
+$("dismiss-job-btn").addEventListener("click",async () => {
   const id = state.selectedJob?.job?.id;
   if (!id) return;
   const dismissed = Boolean(state.selectedJob?.preference?.dismissed);
-  const result = await setJobPreference(id, { dismissed: !dismissed });
+  const result = await setJobPreference(id,{dismissed:!dismissed});
   if (result && !dismissed) closeDrawer();
 });
 
-$("command-trigger").addEventListener("click", openCommandPalette);
-$("command-backdrop").addEventListener("click", closeCommandPalette);
-$("command-input").addEventListener("input", () => {
-  state.commandIndex = 0;
-  renderCommandResults();
+$("companies-refresh").addEventListener("click",() => loadAll());
+$("add-contact-btn").addEventListener("click",() => openEntityModal("contact"));
+$("add-interview-btn").addEventListener("click",() => openEntityModal("interview"));
+$("add-offer-btn").addEventListener("click",() => openEntityModal("offer"));
+$("add-goal-btn").addEventListener("click",() => openEntityModal("goal"));
+$("analyze-message-btn").addEventListener("click",analyzeRecruiterMessage);
+$("export-data-btn").addEventListener("click",() => { window.location.href="/api/export"; });
+
+$("entity-form").addEventListener("submit",submitEntityForm);
+$("entity-modal-close").addEventListener("click",closeEntityModal);
+$("modal-backdrop").addEventListener("click",() => { closeEntityModal(); closeCompareModal(); });
+$("open-compare-btn").addEventListener("click",openCompareModal);
+$("clear-compare-btn").addEventListener("click",() => { state.compareIds=[]; renderCompareTray(); renderJobs(); });
+$("compare-modal-close").addEventListener("click",closeCompareModal);
+
+$("notification-btn").addEventListener("click",() => {
+  $("notification-panel").classList.contains("is-visible") ? closeNotificationPanel() : openNotificationPanel();
 });
-$("command-input").addEventListener("keydown", (event) => {
+$("notification-close").addEventListener("click",closeNotificationPanel);
+
+$("command-trigger").addEventListener("click",openCommandPalette);
+$("command-backdrop").addEventListener("click",closeCommandPalette);
+$("command-input").addEventListener("input",() => { state.commandIndex=0; renderCommandResults(); });
+$("command-input").addEventListener("keydown",(event) => {
   const items = commandItems($("command-input").value);
   if (event.key === "ArrowDown") {
     event.preventDefault();
-    state.commandIndex = Math.min(items.length - 1, state.commandIndex + 1);
+    state.commandIndex = Math.min(items.length - 1,state.commandIndex + 1);
     renderCommandResults();
   } else if (event.key === "ArrowUp") {
     event.preventDefault();
-    state.commandIndex = Math.max(0, state.commandIndex - 1);
+    state.commandIndex = Math.max(0,state.commandIndex - 1);
     renderCommandResults();
   } else if (event.key === "Enter") {
     event.preventDefault();
@@ -1116,7 +1725,7 @@ $("command-input").addEventListener("keydown", (event) => {
   }
 });
 
-document.addEventListener("keydown", (event) => {
+document.addEventListener("keydown",(event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
     event.preventDefault();
     openCommandPalette();
@@ -1124,15 +1733,19 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeDrawer();
     closeCommandPalette();
+    closeNotificationPanel();
+    closeEntityModal();
+    closeCompareModal();
   }
 });
 
 setupTerminalWindow();
 setupPreferences();
+registerServiceWorker();
 switchView("today");
 loadAll();
 pollTerminal();
-setInterval(pollTerminal, 1100);
+setInterval(pollTerminal,1100);
 setInterval(() => {
-  if (state.status?.cycle?.running) loadAll({ quiet: true });
-}, 6500);
+  if (state.status?.cycle?.running) loadAll({quiet:true});
+},6500);
