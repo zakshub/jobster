@@ -1,0 +1,89 @@
+profile_id: personal
+
+display_name: Example Candidate
+
+target_titles:
+  - Senior Product Designer
+  - UX Architect
+  - Product Designer
+  - UX Engineer
+  - AI Product Designer
+
+remote_only: true
+allowed_regions:
+  - worldwide
+  - remote
+
+compensation:
+  currency: USD
+  minimum_monthly: null
+  target_monthly: null
+  anchor_monthly: null
+
+capabilities:
+  - name: Product Design
+    level: core
+    confidence: high
+    aliases:
+      - product designer
+      - product design
+    evidence_ids: []
+  - name: UX Architecture
+    level: core
+    confidence: high
+    aliases:
+      - ux architecture
+      - information architecture
+      - complex workflows
+    evidence_ids: []
+  - name: Design Systems
+    level: strong
+    confidence: high
+    aliases:
+      - design system
+      - component library
+    evidence_ids: []
+  - name: Figma
+    level: strong
+    confidence: high
+    aliases:
+      - figma
+    evidence_ids: []
+  - name: Healthcare Product Design
+    level: strong
+    confidence: high
+    aliases:
+      - healthcare
+      - healthtech
+      - clinical
+    evidence_ids: []
+
+preferences:
+  - name: Complex product systems
+    weight: 4
+    keywords:
+      - complex workflows
+      - platform
+      - systems
+      - enterprise
+  - name: AI product work
+    weight: 3
+    keywords:
+      - artificial intelligence
+      - ai product
+      - llm
+      - agent
+  - name: Design systems
+    weight: 3
+    keywords:
+      - design system
+      - component library
+  - name: Generic marketing production
+    weight: -4
+    keywords:
+      - social media graphics
+      - marketing banners
+      - ad creatives
+      - production designer
+
+evidence: []
