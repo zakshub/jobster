@@ -273,5 +273,41 @@ def run_cycle(
             f"{applications['submitted_confirmed']} application{'s were' if applications['submitted_confirmed'] != 1 else ' was'} confirmed as submitted.",
         )
 
+    for rule in store.list_watch_rules(limit=100):
+        if not rule.get("enabled"):
+            continue
+        criteria = rule.get("criteria") or {}
+        matches = []
+        for job in jobs:
+            title_contains = str(criteria.get("title_contains") or "").strip().lower()
+            company = str(criteria.get("company") or "").strip().lower()
+            currency = str(criteria.get("currency") or "").strip()
+            minimum_raw = criteria.get("minimum_monthly")
+            try:
+                minimum_monthly = float(minimum_raw) if minimum_raw not in (None, "") else None
+            except (TypeError, ValueError):
+                minimum_monthly = None
+
+            if title_contains and title_contains not in job.title.lower():
+                continue
+            if company and company not in job.company.lower():
+                continue
+            if currency and job.currency and job.currency != currency:
+                continue
+            if minimum_monthly is not None:
+                listed = job.salary_max_monthly or job.salary_min_monthly
+                if listed is None or float(listed) < minimum_monthly:
+                    continue
+            matches.append(job)
+
+        if matches:
+            top = matches[0]
+            store.add_notification(
+                "success",
+                f"Watch rule matched: {rule['label']}",
+                f"{len(matches)} job{'s' if len(matches) != 1 else ''} matched. Top match: {top.title} at {top.company}.",
+                job_id=top.id,
+            )
+
     emit("cycle_completed", summary)
     return summary
