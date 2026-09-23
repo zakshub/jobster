@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .answer_bank import load_answer_bank
 from .application_policy import build_application_plan
+from .application_target import resolve_application_target
 from .executors.browser_form import BrowserExecutionError
 from .executors.registry import get_executor
 from .models import ApplicationPlan, ApplicationState, Job, JobEvaluation, PursuitDecision
@@ -72,14 +73,32 @@ def process_applications(
             summary["ready"] += 1
             continue
 
-        executor = get_executor(job)
+        application_job = job
+        executor = get_executor(application_job)
+
+        if executor is None:
+            target = resolve_application_target(job.url)
+            if target is not None:
+                application_job = job.model_copy(update={"url": target.url})
+                executor = get_executor(application_job)
+                store.audit(
+                    "application_target_resolved",
+                    {
+                        "source_url": job.url,
+                        "application_url": target.url,
+                        "ats": target.ats,
+                        "confidence": target.confidence,
+                        "reason": target.reason,
+                    },
+                    job_id=job.id,
+                )
 
         if executor is None:
             plan = ApplicationPlan(
                 job_id=job.id,
                 ats="unknown",
                 state=ApplicationState.BLOCKED,
-                reasons=["No supported ATS executor for this application URL"],
+                reasons=["Jobster could not find a supported application form from this job page"],
             )
             store.save_application_plan(plan)
             store.audit("application_unsupported", {"url": job.url}, job_id=job.id)
@@ -87,7 +106,7 @@ def process_applications(
             continue
 
         try:
-            questions = executor.inspect_questions(job)
+            questions = executor.inspect_questions(application_job)
             allow_submit = (
                 config.application.auto_submit
                 and submit_authorized
@@ -145,7 +164,7 @@ def process_applications(
                 store.audit("application_prepared", {"ats": plan.ats}, job_id=job.id)
                 continue
 
-            receipt = executor.execute(job, plan)
+            receipt = executor.execute(application_job, plan)
             store.save_receipt(job.id, receipt)
             submitted_this_cycle += 1
 
