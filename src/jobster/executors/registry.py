@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from jobster.ats import detect_ats
 from jobster.models import Job
-from .browser_form import AshbyExecutor, GreenhouseExecutor, LeverExecutor, WorkdayExecutor
+from .browser_form import AshbyExecutor, GenericCareersExecutor, GreenhouseExecutor, LeverExecutor, WorkdayExecutor
 
 
 EXECUTORS = {
@@ -10,6 +10,7 @@ EXECUTORS = {
     "lever": LeverExecutor,
     "ashby": AshbyExecutor,
     "workday": WorkdayExecutor,
+    "generic_careers": GenericCareersExecutor,
 }
 
 
