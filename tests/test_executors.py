@@ -1,6 +1,6 @@
 import pytest
 
-from jobster.executors.browser_form import BrowserExecutionError, WorkdayExecutor
+from jobster.executors.browser_form import BrowserExecutionError, GenericCareersExecutor, WorkdayExecutor
 from jobster.executors.registry import get_executor
 from jobster.models import ApplicationPlan, ApplicationState, Job
 
@@ -22,3 +22,18 @@ def test_workday_is_inspection_only():
     plan = ApplicationPlan(job_id="4", ats="workday", state=ApplicationState.READY, can_submit_automatically=True)
     with pytest.raises(BrowserExecutionError):
         executor.execute(job, plan)
+
+
+def test_generic_company_careers_form_is_supervised():
+    job = Job(
+        id="5",
+        title="x",
+        company="x",
+        description="x",
+        url="https://example.com/careers/jobs/designer",
+    )
+    executor = get_executor(job)
+    assert isinstance(executor, GenericCareersExecutor)
+    assert executor.capability.can_inspect is True
+    assert executor.capability.can_fill is True
+    assert executor.capability.can_submit is False
