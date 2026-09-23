@@ -146,6 +146,49 @@ CREATE TABLE IF NOT EXISTS career_goals (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS outreach_drafts (
+    id TEXT PRIMARY KEY,
+    contact_id TEXT,
+    job_id TEXT,
+    channel TEXT NOT NULL DEFAULT 'email',
+    subject TEXT,
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft',
+    scheduled_for TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(contact_id) REFERENCES contacts(id),
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+CREATE TABLE IF NOT EXISTS star_stories (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    situation TEXT,
+    task TEXT,
+    action TEXT,
+    result TEXT,
+    skills_json TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS application_artifacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL,
+    artifact_type TEXT NOT NULL,
+    path TEXT NOT NULL,
+    label TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+CREATE TABLE IF NOT EXISTS watch_rules (
+    id TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    criteria_json TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -949,3 +992,186 @@ class JobsterStore:
                 (limit,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+
+    def upsert_outreach(self, payload: dict) -> dict:
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO outreach_drafts(id, contact_id, job_id, channel, subject, body, status, scheduled_for)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  contact_id=excluded.contact_id,
+                  job_id=excluded.job_id,
+                  channel=excluded.channel,
+                  subject=excluded.subject,
+                  body=excluded.body,
+                  status=excluded.status,
+                  scheduled_for=excluded.scheduled_for,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (
+                    payload["id"],
+                    payload.get("contact_id"),
+                    payload.get("job_id"),
+                    payload.get("channel", "email"),
+                    payload.get("subject"),
+                    payload["body"],
+                    payload.get("status", "draft"),
+                    payload.get("scheduled_for"),
+                ),
+            )
+        return payload
+
+    def list_outreach(self, limit: int = 200) -> list[dict]:
+        with self.connect() as con:
+            rows = con.execute(
+                """SELECT o.id, o.contact_id, o.job_id, o.channel, o.subject, o.body,
+                          o.status, o.scheduled_for, o.created_at, o.updated_at,
+                          c.name AS contact_name, c.company AS contact_company,
+                          j.title AS job_title, j.company AS job_company
+                   FROM outreach_drafts o
+                   LEFT JOIN contacts c ON c.id = o.contact_id
+                   LEFT JOIN jobs j ON j.id = o.job_id
+                   ORDER BY o.updated_at DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def upsert_star_story(self, payload: dict) -> dict:
+        skills = payload.get("skills") or []
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO star_stories(id, title, situation, task, action, result, skills_json, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  title=excluded.title,
+                  situation=excluded.situation,
+                  task=excluded.task,
+                  action=excluded.action,
+                  result=excluded.result,
+                  skills_json=excluded.skills_json,
+                  status=excluded.status,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (
+                    payload["id"],
+                    payload["title"],
+                    payload.get("situation"),
+                    payload.get("task"),
+                    payload.get("action"),
+                    payload.get("result"),
+                    json.dumps(skills),
+                    payload.get("status", "active"),
+                ),
+            )
+        return payload
+
+    def list_star_stories(self, limit: int = 200) -> list[dict]:
+        with self.connect() as con:
+            rows = con.execute(
+                """SELECT id, title, situation, task, action, result, skills_json, status,
+                          created_at, updated_at
+                   FROM star_stories
+                   ORDER BY updated_at DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [
+            {
+                **dict(row),
+                "skills": json.loads(row["skills_json"] or "[]"),
+            }
+            for row in rows
+        ]
+
+    def save_application_artifact(
+        self,
+        job_id: str,
+        artifact_type: str,
+        path: str,
+        label: str | None = None,
+    ) -> dict:
+        with self.connect() as con:
+            cur = con.execute(
+                """INSERT INTO application_artifacts(job_id, artifact_type, path, label)
+                   VALUES (?, ?, ?, ?)""",
+                (job_id, artifact_type, path, label),
+            )
+            artifact_id = cur.lastrowid
+        return {
+            "id": artifact_id,
+            "job_id": job_id,
+            "artifact_type": artifact_type,
+            "path": path,
+            "label": label,
+        }
+
+    def list_application_artifacts(self, job_id: str | None = None, limit: int = 300) -> list[dict]:
+        query = """SELECT a.id, a.job_id, a.artifact_type, a.path, a.label, a.created_at,
+                          j.title, j.company
+                   FROM application_artifacts a
+                   LEFT JOIN jobs j ON j.id = a.job_id"""
+        params: tuple
+        if job_id:
+            query += " WHERE a.job_id = ?"
+            params = (job_id, limit)
+        else:
+            params = (limit,)
+        query += " ORDER BY a.id DESC LIMIT ?"
+        with self.connect() as con:
+            rows = con.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def upsert_watch_rule(self, payload: dict) -> dict:
+        criteria = payload.get("criteria") or {}
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO watch_rules(id, label, criteria_json, enabled)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  label=excluded.label,
+                  criteria_json=excluded.criteria_json,
+                  enabled=excluded.enabled,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (
+                    payload["id"],
+                    payload["label"],
+                    json.dumps(criteria, sort_keys=True),
+                    1 if payload.get("enabled", True) else 0,
+                ),
+            )
+        return payload
+
+    def list_watch_rules(self, limit: int = 100) -> list[dict]:
+        with self.connect() as con:
+            rows = con.execute(
+                """SELECT id, label, criteria_json, enabled, created_at, updated_at
+                   FROM watch_rules
+                   ORDER BY enabled DESC, updated_at DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [
+            {
+                **dict(row),
+                "criteria": json.loads(row["criteria_json"] or "{}"),
+                "enabled": bool(row["enabled"]),
+            }
+            for row in rows
+        ]
+
+    def emergency_stop(self) -> dict:
+        actions = ("search", "prepare", "submit", "contact", "follow_up")
+        with self.connect() as con:
+            for action in actions:
+                con.execute(
+                    """INSERT INTO automation_authority(action, enabled, requires_approval)
+                    VALUES (?, 0, 1)
+                    ON CONFLICT(action) DO UPDATE SET
+                      enabled=0,
+                      requires_approval=1,
+                      updated_at=CURRENT_TIMESTAMP""",
+                    (action,),
+                )
+        result = {"stopped": True, "actions": list(actions)}
+        self.audit("emergency_stop", result)
+        return result
