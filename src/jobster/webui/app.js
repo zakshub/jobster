@@ -29,6 +29,7 @@ const state = {
   usage: null,
   integrations: null,
   selectedJob: null,
+  reviewSession: null,
   selectedOffer: null,
   compareIds: [],
   filter: "all",
@@ -1587,6 +1588,40 @@ function renderVerification(verification) {
   $("verification-detail").textContent = verification?.detail || "Check the job page before preparing an application.";
 }
 
+function renderReviewSession(session) {
+  state.reviewSession = session || null;
+  const button = $("review-job-btn");
+  if (!button) return;
+  const status = session?.status;
+  const labels = {
+    launching: "Opening browser…",
+    preparing: "Filling application…",
+    needs_user: "Continue filling",
+    needs_login: "Continue after login",
+    needs_input: "Continue filling",
+    awaiting_review: "Check submission",
+    unconfirmed: "Check again",
+    submitted: "Submitted",
+    email_available: "Save Gmail draft",
+    email_saved: "Open Gmail Drafts",
+    cancelled: "Fill & review",
+    interrupted: "Fill & review",
+    failed: "Retry fill & review",
+  };
+  button.querySelector("span").textContent = labels[status] || "Fill & review";
+  button.disabled = ["launching", "preparing", "submitted"].includes(status);
+  if (session?.message) $("drawer-note").textContent = session.message;
+}
+
+async function loadReviewSession(jobId) {
+  try {
+    const session = await api(`/api/jobs/${encodeURIComponent(jobId)}/review-session`);
+    renderReviewSession(session);
+  } catch (_) {
+    renderReviewSession(null);
+  }
+}
+
 async function openJob(jobId) {
   try {
     const bundle = await api(`/api/jobs/${encodeURIComponent(jobId)}`);
@@ -1648,6 +1683,7 @@ async function openJob(jobId) {
     $("open-job-btn").disabled = !job.url;
     $("verify-job-btn").disabled = !job.url;
     $("prepare-job-btn").disabled = !evaluation;
+    $("review-job-btn").disabled = !evaluation || !job.url;
     $("compare-job-btn").classList.toggle("is-active", state.compareIds.includes(job.id));
     $("drawer-note").textContent = application
       ? `Application: ${pipelineLabels[application.state] || application.state}. ${(application.reasons || []).join(" ")}`
@@ -1656,6 +1692,7 @@ async function openJob(jobId) {
     $("drawer-backdrop").classList.add("is-visible");
     $("job-drawer").classList.add("is-visible");
     $("job-drawer").setAttribute("aria-hidden", "false");
+    await loadReviewSession(job.id);
   } catch (error) {
     showToast(error.message);
   }
@@ -1721,6 +1758,71 @@ async function prepareSelectedJob() {
   } finally {
     $("prepare-job-btn").disabled = false;
     $("prepare-job-btn").innerHTML = `${icon("briefcase")}<span>Prepare application</span>`;
+  }
+}
+
+async function connectGmail() {
+  const result = await api("/api/integrations/gmail/connect", { method: "POST" });
+  window.open(result.authorization_url, "_blank", "noopener,noreferrer");
+  showToast("Complete the Gmail connection, then choose Save Gmail draft again.");
+}
+
+async function saveSelectedEmailDraft() {
+  const jobId = state.selectedJob?.job?.id;
+  if (!jobId) return;
+  try {
+    const result = await api(`/api/jobs/${encodeURIComponent(jobId)}/email-draft`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    renderReviewSession({ status: "email_saved", message: "Application email saved in Gmail Drafts.", gmail_url: result.gmail_url });
+    showToast("Application email saved in Gmail Drafts.");
+    window.open(result.gmail_url, "_blank", "noopener,noreferrer");
+  } catch (error) {
+    if (String(error.message).toLowerCase().includes("connect gmail")) {
+      try { await connectGmail(); } catch (connectError) { showToast(connectError.message); }
+      return;
+    }
+    showToast(error.message);
+  }
+}
+
+async function pollReviewSession(jobId) {
+  for (let attempt = 0; attempt < 90; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (state.selectedJob?.job?.id !== jobId) return;
+    try {
+      const session = await api(`/api/jobs/${encodeURIComponent(jobId)}/review-session`);
+      renderReviewSession(session);
+      if (!["launching", "preparing"].includes(session.status)) return;
+    } catch (error) {
+      showToast(error.message);
+      return;
+    }
+  }
+}
+
+async function startOrContinueReview() {
+  const jobId = state.selectedJob?.job?.id;
+  if (!jobId) return;
+  const status = state.reviewSession?.status;
+  if (status === "email_available") return saveSelectedEmailDraft();
+  if (status === "email_saved") {
+    return window.open(state.reviewSession.gmail_url || "https://mail.google.com/mail/u/0/#drafts", "_blank", "noopener,noreferrer");
+  }
+  const command = ["needs_user", "needs_login", "needs_input"].includes(status)
+    ? "continue"
+    : ["awaiting_review", "unconfirmed"].includes(status)
+      ? "check"
+      : null;
+  try {
+    const session = command
+      ? await api(`/api/jobs/${encodeURIComponent(jobId)}/review-session/${command}`, { method: "POST" })
+      : await api(`/api/jobs/${encodeURIComponent(jobId)}/review-session`, { method: "POST" });
+    renderReviewSession(session);
+    pollReviewSession(jobId);
+  } catch (error) {
+    showToast(error.message);
   }
 }
 
@@ -2148,6 +2250,7 @@ $("drawer-close").addEventListener("click",closeDrawer);
 $("drawer-backdrop").addEventListener("click",closeDrawer);
 $("verify-job-btn").addEventListener("click",verifySelectedJob);
 $("prepare-job-btn").addEventListener("click",prepareSelectedJob);
+$("review-job-btn").addEventListener("click",startOrContinueReview);
 $("compare-job-btn").addEventListener("click",() => {
   const id = state.selectedJob?.job?.id;
   if (id) toggleCompare(id);

@@ -85,6 +85,10 @@ class ApplicationConfig(BaseModel):
     auto_submit: bool = False
     semantic_reasoning: bool = True
     answer_bank_path: str = "private_data/answer_bank.yaml"
+    resume_path: str | None = None
+    browser_profile_path: str = "private_data/browser_profile"
+    gmail_client_secret_path: str = "private_data/gmail_client_secret.json"
+    gmail_token_path: str = "private_data/gmail_token.json"
     max_submissions_per_cycle: int = Field(default=5, ge=0, le=25)
     submission_schedule: SubmissionScheduleConfig = Field(
         default_factory=SubmissionScheduleConfig

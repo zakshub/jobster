@@ -189,10 +189,17 @@ Canonical enterprise UI specification:
 - [x] Login/CAPTCHA human checkpoint
 - [x] Confirmed-submission screenshot proof
 - [x] Human editorial anti-AI visual language
+- [x] Visible Windows application-review sessions
+- [x] Safe Apply-link and external-site continuation
+- [x] Login, account, OTP, CAPTCHA and unknown-field handoffs
+- [x] Final Submit reserved for the user in supervised mode
+- [x] Explicit apply-by-email detection
+- [x] Contextual Gmail drafts with approved resume attachments
 
 ### External connection boundaries
 
-- [ ] Authenticated email sending — requires mail connector/provider
+- [x] Authenticated Gmail draft creation — requires owner OAuth setup
+- [ ] Authenticated email sending — intentionally not exposed
 - [ ] Live calendar synchronization — requires calendar connector
 - [ ] Direct LinkedIn messaging — not implemented
 - [ ] Workday final auto-submit — still inspection-only

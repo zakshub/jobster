@@ -91,6 +91,12 @@ application:
   semantic_reasoning: true
   auto_submit: false
   answer_bank_path: private_data/answer_bank.yaml
+  # Use a finished PDF or DOCX for real applications. Generated Markdown is
+  # kept as preparation material and is not attached automatically.
+  resume_path:
+  browser_profile_path: private_data/browser_profile
+  gmail_client_secret_path: private_data/gmail_client_secret.json
+  gmail_token_path: private_data/gmail_token.json
   max_submissions_per_cycle: 5
 
   # Search/evaluation may continue over the weekend, but final automatic

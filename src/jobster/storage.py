@@ -43,6 +43,25 @@ CREATE TABLE IF NOT EXISTS automation_receipts (
     payload_json TEXT NOT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS application_review_sessions (
+    job_id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+CREATE TABLE IF NOT EXISTS email_application_drafts (
+    job_id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    provider_draft_id TEXT,
+    recipient TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    attachment_path TEXT NOT NULL,
+    status TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
 CREATE TABLE IF NOT EXISTS audit_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id TEXT,
@@ -1315,6 +1334,74 @@ class JobsterStore:
                 (limit,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def save_review_session(self, job_id: str, payload: dict) -> dict:
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO application_review_sessions(job_id, status, payload_json)
+                VALUES (?, ?, ?)
+                ON CONFLICT(job_id) DO UPDATE SET
+                  status=excluded.status,
+                  payload_json=excluded.payload_json,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (job_id, str(payload.get("status") or "unknown"), json.dumps(payload)),
+            )
+        return payload
+
+    def get_review_session(self, job_id: str) -> dict | None:
+        with self.connect() as con:
+            row = con.execute(
+                """SELECT payload_json, updated_at
+                FROM application_review_sessions WHERE job_id = ?""",
+                (job_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        payload = json.loads(row["payload_json"])
+        payload["stored_at"] = row["updated_at"]
+        return payload
+
+    def save_email_application_draft(self, job_id: str, payload: dict) -> dict:
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO email_application_drafts(
+                  job_id, provider, provider_draft_id, recipient, subject,
+                  attachment_path, status, payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(job_id) DO UPDATE SET
+                  provider=excluded.provider,
+                  provider_draft_id=excluded.provider_draft_id,
+                  recipient=excluded.recipient,
+                  subject=excluded.subject,
+                  attachment_path=excluded.attachment_path,
+                  status=excluded.status,
+                  payload_json=excluded.payload_json,
+                  updated_at=CURRENT_TIMESTAMP""",
+                (
+                    job_id,
+                    str(payload.get("provider") or "gmail"),
+                    payload.get("provider_draft_id"),
+                    str(payload.get("recipient") or ""),
+                    str(payload.get("subject") or ""),
+                    str(payload.get("attachment_path") or ""),
+                    str(payload.get("status") or "draft"),
+                    json.dumps(payload),
+                ),
+            )
+        return payload
+
+    def get_email_application_draft(self, job_id: str) -> dict | None:
+        with self.connect() as con:
+            row = con.execute(
+                """SELECT payload_json, updated_at
+                FROM email_application_drafts WHERE job_id = ?""",
+                (job_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        payload = json.loads(row["payload_json"])
+        payload["stored_at"] = row["updated_at"]
+        return payload
 
     def emergency_stop(self) -> dict:
         actions = ("search", "prepare", "submit", "contact", "follow_up")

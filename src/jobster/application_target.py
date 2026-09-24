@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlparse
+import re
+from urllib.parse import parse_qs, unquote, urljoin, urlparse
 
 import httpx
 
@@ -15,6 +16,9 @@ class ApplicationTarget:
     ats: str
     confidence: str
     reason: str
+    kind: str = "web_form"
+    recipient: str | None = None
+    subject: str | None = None
 
 
 class _LinkParser(HTMLParser):
@@ -23,6 +27,7 @@ class _LinkParser(HTMLParser):
         self.links: list[tuple[str, str]] = []
         self._href: str | None = None
         self._text: list[str] = []
+        self.document_text: list[str] = []
 
     def handle_starttag(self, tag: str, attrs):
         if tag.lower() != "a":
@@ -34,6 +39,8 @@ class _LinkParser(HTMLParser):
             self._text = []
 
     def handle_data(self, data: str):
+        if data.strip():
+            self.document_text.append(data.strip())
         if self._href is not None:
             self._text.append(data)
 
@@ -104,27 +111,74 @@ def resolve_from_html(source_url: str, html_text: str) -> ApplicationTarget | No
     parser = _LinkParser()
     parser.feed(html_text)
 
-    candidates: list[tuple[int, str, str]] = []
+    candidates: list[tuple[int, ApplicationTarget]] = []
     for href, text in parser.links:
-        if href.startswith(("#", "mailto:", "tel:", "javascript:")):
+        if href.lower().startswith("mailto:"):
+            parsed_mail = urlparse(href)
+            recipient = unquote(parsed_mail.path).strip()
+            if not recipient:
+                continue
+            query = parse_qs(parsed_mail.query)
+            subject = unquote(query.get("subject", [""])[0]).strip() or None
+            label = text.strip().lower()
+            score = 90 if "apply" in label else 60
+            candidates.append(
+                (
+                    score,
+                    ApplicationTarget(
+                        url=href,
+                        ats="email",
+                        confidence="high" if score >= 90 else "medium",
+                        reason="explicit application email address",
+                        kind="email",
+                        recipient=recipient,
+                        subject=subject,
+                    ),
+                )
+            )
+            continue
+        if href.startswith(("#", "tel:", "javascript:")):
             continue
         absolute = urljoin(source_url, href)
         score, reason = _candidate_score(source_url, absolute, text)
         if score > 0:
-            candidates.append((score, absolute, reason))
+            candidates.append(
+                (
+                    score,
+                    ApplicationTarget(
+                        url=absolute,
+                        ats=detect_ats(absolute),
+                        confidence="high" if score >= 100 else "medium" if score >= 70 else "low",
+                        reason=reason,
+                    ),
+                )
+            )
+
+    plain_text = re.sub(r"\s+", " ", " ".join(parser.document_text))
+    for match in re.finditer(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", plain_text, re.I):
+        context = plain_text[max(0, match.start() - 120) : match.end() + 120].lower()
+        if not any(word in context for word in ("apply", "application", "resume", "cv")):
+            continue
+        recipient = match.group(0)
+        candidates.append(
+            (
+                80,
+                ApplicationTarget(
+                    url=f"mailto:{recipient}",
+                    ats="email",
+                    confidence="medium",
+                    reason="application instructions contain an email address",
+                    kind="email",
+                    recipient=recipient,
+                ),
+            )
+        )
 
     if not candidates:
         return None
 
     candidates.sort(key=lambda item: item[0], reverse=True)
-    score, url, reason = candidates[0]
-    confidence = "high" if score >= 100 else "medium" if score >= 70 else "low"
-    return ApplicationTarget(
-        url=url,
-        ats=detect_ats(url),
-        confidence=confidence,
-        reason=reason,
-    )
+    return candidates[0][1]
 
 
 def resolve_application_target(

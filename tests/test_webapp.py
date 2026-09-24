@@ -10,6 +10,7 @@ from jobster.models import (
     JobEvaluation,
     PursuitDecision,
 )
+from jobster.application_target import ApplicationTarget
 from jobster.storage import JobsterStore
 from jobster.webapp import app
 
@@ -446,3 +447,47 @@ def test_omni_intelligence_endpoints(tmp_path, monkeypatch):
     integrations = client.get("/api/integrations")
     assert integrations.status_code == 200
     assert integrations.json()["email"]["connected"] is False
+
+
+def test_email_application_is_saved_as_gmail_draft(tmp_path, monkeypatch):
+    db_path = configure_runtime(tmp_path, monkeypatch)
+    seed(db_path)
+    resume = tmp_path / "resume.pdf"
+    resume.write_bytes(b"approved resume")
+    search_path = tmp_path / "config" / "search.yaml"
+    search_path.write_text(
+        SEARCH.replace(
+            "answer_bank_path: private_data/answer_bank.yaml",
+            f"answer_bank_path: private_data/answer_bank.yaml\n  resume_path: {resume.as_posix()}",
+        ),
+        encoding="utf-8",
+    )
+
+    class Gmail:
+        def connected(self):
+            return True
+
+        def create_draft(self, **kwargs):
+            assert kwargs["recipient"] == "jobs@acme.example"
+            assert kwargs["attachment_path"] == resume
+            return {"id": "gmail-draft-1"}
+
+    monkeypatch.setattr("jobster.webapp._gmail_provider", lambda config: Gmail())
+    monkeypatch.setattr(
+        "jobster.webapp.resolve_application_target",
+        lambda url: ApplicationTarget(
+            url="mailto:jobs@acme.example",
+            ats="email",
+            confidence="high",
+            reason="explicit application email address",
+            kind="email",
+            recipient="jobs@acme.example",
+        ),
+    )
+
+    response = TestClient(app).post("/api/jobs/job-1/email-draft", json={})
+    assert response.status_code == 200
+    assert response.json()["provider_draft_id"] == "gmail-draft-1"
+    assert response.json()["status"] == "saved"
+    stored = JobsterStore(db_path).get_email_application_draft("job-1")
+    assert stored["recipient"] == "jobs@acme.example"

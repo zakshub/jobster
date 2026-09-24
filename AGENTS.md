@@ -7,8 +7,9 @@
 3. docs/brain/CAREER_BRAIN.md
 4. docs/brain/EVIDENCE_AND_LEARNING.md
 5. docs/product/AUTONOMY_POLICY.md
-6. docs/architecture/SYSTEM_ARCHITECTURE.md
-7. docs/security/PRIVACY_AND_TRUTH.md
+6. docs/product/SUPERVISED_APPLICATIONS.md
+7. docs/architecture/SYSTEM_ARCHITECTURE.md
+8. docs/security/PRIVACY_AND_TRUTH.md
 
 ## Core rules
 

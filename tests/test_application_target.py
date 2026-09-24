@@ -27,9 +27,33 @@ def test_finds_company_careers_apply_link():
     assert target.url == "https://acme.example/careers/jobs/senior-product-designer"
 
 
-def test_ignores_non_web_and_same_page_links():
+def test_finds_explicit_email_application():
     html = """
     <a href="#apply">Apply</a>
     <a href="mailto:jobs@example.com">Apply by email</a>
     """
-    assert resolve_from_html("https://example.com/jobs/1", html) is None
+    target = resolve_from_html("https://example.com/jobs/1", html)
+    assert target is not None
+    assert target.kind == "email"
+    assert target.recipient == "jobs@example.com"
+
+
+def test_ignores_fragment_without_an_application_destination():
+    assert resolve_from_html("https://example.com/jobs/1", '<a href="#apply">Apply</a>') is None
+
+
+def test_finds_email_in_application_instructions_without_mailto():
+    target = resolve_from_html(
+        "https://example.com/jobs/1",
+        "<p>To apply, send your resume to careers@example.com.</p>",
+    )
+    assert target is not None
+    assert target.kind == "email"
+    assert target.recipient == "careers@example.com"
+
+
+def test_does_not_treat_unrelated_contact_email_as_application_route():
+    assert resolve_from_html(
+        "https://example.com/jobs/1",
+        "<footer>Questions? Contact support@example.com.</footer>",
+    ) is None

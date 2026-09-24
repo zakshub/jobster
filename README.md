@@ -60,8 +60,13 @@ The enterprise command center provides:
 - one-click job search with a draggable/resizable live activity window
 - source verification before application preparation
 - application-packet preparation for evaluated jobs
+- visible application filling that stops for your final review and Submit click
+- Gmail application drafts with contextual copy and an approved resume attachment
 
 See `docs/design/ENTERPRISE_COMMAND_CENTER.md` for the current design and interaction contract.
+
+See `docs/product/SUPERVISED_APPLICATIONS.md` for application redirects,
+LinkedIn boundaries, login/account handoffs, and Gmail draft setup.
 
 The UI does not expose private keys, internal prompts or hidden reasoning.
 

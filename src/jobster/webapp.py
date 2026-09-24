@@ -3,19 +3,32 @@ from __future__ import annotations
 import asyncio
 import os
 import uuid
+from html import escape
 from collections import Counter, deque
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .answer_bank import load_answer_bank
+from .ats import detect_ats
 from .application_packet import build_application_packet
+from .application_target import resolve_application_target
+from .cover_letter import build_email_application
+from .gmail_drafts import GmailDraftError, GmailDraftProvider
 from .intelligence import build_daily_missions, build_evidence_snapshot, build_insights
-from .models import Job, JobEvaluation, NegotiationContext
+from .models import (
+    ApplicationAnswer,
+    ApplicationPlan,
+    ApplicationQuestion,
+    ApplicationState,
+    Job,
+    JobEvaluation,
+    NegotiationContext,
+)
 from .omni_intelligence import (
     build_career_graph,
     build_data_health,
@@ -30,6 +43,7 @@ from .recruiter import advise_recruiter_message
 from .profile import load_profile
 from .quota import SerpApiQuota
 from .relevance import score_job_relevance
+from .review_sessions import ReviewSessionManager
 from .runner import build_sources, run_cycle
 from .settings import load_search_config
 from .storage import JobsterStore
@@ -161,6 +175,9 @@ class CycleController:
 
 
 cycle_controller = CycleController()
+review_sessions = ReviewSessionManager()
+_gmail_providers: dict[tuple[str, str], GmailDraftProvider] = {}
+_gmail_provider_lock = Lock()
 
 
 def _paths() -> tuple[Path, Path, Path]:
@@ -178,6 +195,72 @@ def _runtime():
     store = JobsterStore(db_path)
     store.init()
     return profile, config, store
+
+
+def _gmail_provider(config) -> GmailDraftProvider:
+    key = (
+        config.application.gmail_client_secret_path,
+        config.application.gmail_token_path,
+    )
+    with _gmail_provider_lock:
+        if key not in _gmail_providers:
+            _gmail_providers[key] = GmailDraftProvider(*key)
+        return _gmail_providers[key]
+
+
+def _persist_review_snapshot(store: JobsterStore, job_id: str, payload: dict) -> dict:
+    store.save_review_session(job_id, payload)
+    status = payload.get("status")
+    if status not in {
+        "awaiting_review",
+        "needs_user",
+        "needs_login",
+        "needs_input",
+        "unconfirmed",
+        "submitted",
+    }:
+        return payload
+    bundle = store.get_job_bundle(job_id)
+    if bundle is None:
+        return payload
+    existing = bundle.get("application")
+    plan = (
+        ApplicationPlan.model_validate(existing)
+        if existing
+        else ApplicationPlan(
+            job_id=job_id,
+            ats=detect_ats(bundle["job"].get("url")),
+            state=ApplicationState.PREPARING,
+        )
+    )
+    previous_state = plan.state
+    if status == "submitted":
+        plan.state = ApplicationState.SUBMITTED
+    elif status == "awaiting_review":
+        plan.state = ApplicationState.READY
+    else:
+        plan.state = ApplicationState.BLOCKED
+    message = str(payload.get("message") or "").strip()
+    if message and message not in plan.reasons:
+        plan.reasons.append(message)
+    for label in payload.get("missing_questions") or []:
+        if not any(question.label == label for question in plan.unknown_questions):
+            plan.unknown_questions.append(
+                ApplicationQuestion(key=str(label), label=str(label), required=True)
+            )
+    store.save_application_plan(plan)
+    if status == "submitted" and previous_state != ApplicationState.SUBMITTED:
+        store.save_receipt(
+            job_id,
+            {
+                "status": "submitted_confirmed",
+                "reason": message,
+                "url_after_submit": payload.get("current_url"),
+                "mode": "supervised_review",
+            },
+        )
+        store.audit("supervised_application_confirmed", payload, job_id=job_id)
+    return payload
 
 
 def _quota_payload(config) -> dict:
@@ -768,11 +851,18 @@ def create_app() -> FastAPI:
 
     @app.get("/api/integrations")
     def integrations():
+        _, config, _ = _runtime()
+        gmail = _gmail_provider(config)
+        gmail_connected = gmail.connected()
         return {
             "email": {
-                "connected": False,
-                "status": "connection_required",
-                "detail": "Recruiter outreach drafts are available. Sending needs an authenticated mail connection.",
+                "connected": gmail_connected,
+                "status": "connected" if gmail_connected else "connection_required",
+                "detail": (
+                    "Gmail can save application drafts with attachments."
+                    if gmail_connected
+                    else "Connect Gmail to save application drafts. Jobster never sends them."
+                ),
             },
             "calendar": {
                 "connected": False,
@@ -785,6 +875,33 @@ def create_app() -> FastAPI:
                 "detail": "Jobster does not claim direct LinkedIn messaging or private-message access.",
             },
         }
+
+    @app.post("/api/integrations/gmail/connect")
+    def connect_gmail(request: Request):
+        _, config, _ = _runtime()
+        provider = _gmail_provider(config)
+        redirect_uri = str(request.url_for("gmail_callback"))
+        try:
+            start = provider.start_oauth(redirect_uri)
+        except GmailDraftError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {"authorization_url": start.authorization_url}
+
+    @app.get("/api/integrations/gmail/callback", name="gmail_callback")
+    def gmail_callback(request: Request, code: str, state: str):
+        _, config, _ = _runtime()
+        provider = _gmail_provider(config)
+        redirect_uri = str(request.url_for("gmail_callback"))
+        try:
+            provider.finish_oauth(code, state, redirect_uri)
+        except GmailDraftError as exc:
+            return HTMLResponse(
+                f"<h1>Gmail connection failed</h1><p>{escape(str(exc))}</p>",
+                status_code=400,
+            )
+        return HTMLResponse(
+            "<h1>Gmail connected</h1><p>Return to Jobster. Draft creation is now available.</p>"
+        )
 
     @app.get("/api/jobs")
     def jobs(limit: int = 100, offset: int = 0, include_irrelevant: bool = False):
@@ -1041,6 +1158,173 @@ def create_app() -> FastAPI:
     def applications(limit: int = 100):
         _, _, store = _runtime()
         return store.list_application_summaries(limit=min(max(limit, 1), 500))
+
+    @app.get("/api/jobs/{job_id}/review-session")
+    def review_session(job_id: str):
+        _, _, store = _runtime()
+        live = review_sessions.get(job_id)
+        if live is not None:
+            return _persist_review_snapshot(store, job_id, live)
+        stored = store.get_review_session(job_id)
+        if stored is None:
+            raise HTTPException(status_code=404, detail="No application review session")
+        return stored
+
+    @app.post("/api/jobs/{job_id}/review-session")
+    async def start_review_session(job_id: str):
+        _, config, store = _runtime()
+        bundle = store.get_job_bundle(job_id)
+        if bundle is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        job = Job.model_validate(bundle["job"])
+        if not job.url:
+            raise HTTPException(status_code=409, detail="Job has no application URL")
+
+        target = await asyncio.to_thread(resolve_application_target, job.url)
+        if target is not None and target.kind == "email":
+            payload = {
+                "job_id": job_id,
+                "status": "email_available",
+                "message": "This job accepts applications by email. Save it as a Gmail draft.",
+                "email_recipient": target.recipient,
+                "email_subject": target.subject,
+                "current_url": job.url,
+            }
+            return _persist_review_snapshot(store, job_id, payload)
+        if target is not None and target.kind == "web_form":
+            job = job.model_copy(update={"url": target.url})
+
+        answers = load_answer_bank(config.application.answer_bank_path)
+        if config.application.resume_path:
+            resume_path = Path(config.application.resume_path).expanduser()
+            if resume_path.is_file():
+                answers.append(
+                    ApplicationAnswer(
+                        key="resume",
+                        value=str(resume_path),
+                        aliases=[
+                            "resume upload",
+                            "upload resume",
+                            "resume/cv",
+                            "cv",
+                            "curriculum vitae",
+                        ],
+                        verified=True,
+                        allow_automatic_use=True,
+                    )
+                )
+        try:
+            payload = review_sessions.start(
+                job,
+                answers,
+                config.application.browser_profile_path,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        _persist_review_snapshot(store, job_id, payload)
+        store.audit("application_review_started", payload, job_id=job_id)
+        return payload
+
+    @app.post("/api/jobs/{job_id}/review-session/{command}")
+    def control_review_session(job_id: str, command: str):
+        if command not in {"continue", "check", "close"}:
+            raise HTTPException(status_code=400, detail="Unknown review-session command")
+        _, _, store = _runtime()
+        try:
+            review_sessions.command(job_id, command)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="No live application review session") from exc
+        payload = review_sessions.get(job_id) or {"job_id": job_id, "status": "unknown"}
+        _persist_review_snapshot(store, job_id, payload)
+        store.audit(f"application_review_{command}", payload, job_id=job_id)
+        return payload
+
+    @app.post("/api/jobs/{job_id}/email-draft")
+    async def create_email_draft(job_id: str, payload: dict | None = None):
+        profile, config, store = _runtime()
+        payload = payload or {}
+        bundle = store.get_job_bundle(job_id)
+        if bundle is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if not bundle.get("evaluation"):
+            raise HTTPException(status_code=409, detail="Job has not been evaluated")
+
+        existing = store.get_email_application_draft(job_id)
+        if existing and existing.get("provider_draft_id") and not payload.get("replace"):
+            return existing
+
+        job = Job.model_validate(bundle["job"])
+        evaluation = JobEvaluation.model_validate(bundle["evaluation"])
+        recipient = str(payload.get("recipient") or "").strip()
+        target = await asyncio.to_thread(resolve_application_target, job.url)
+        if not recipient and target is not None and target.kind == "email":
+            recipient = target.recipient or ""
+        live = review_sessions.get(job_id)
+        if not recipient and live:
+            recipient = str(live.get("email_recipient") or "")
+        if not recipient:
+            raise HTTPException(
+                status_code=409,
+                detail="No explicit application email address was found. Jobster will not guess one.",
+            )
+
+        resume_path = Path(config.application.resume_path or "").expanduser()
+        if not config.application.resume_path or not resume_path.is_file():
+            raise HTTPException(
+                status_code=409,
+                detail="Set application.resume_path to an approved PDF or DOCX resume first.",
+            )
+        if resume_path.suffix.lower() not in {".pdf", ".doc", ".docx"}:
+            raise HTTPException(
+                status_code=409,
+                detail="The application resume must be a PDF or Word document.",
+            )
+
+        content = build_email_application(profile, job, evaluation)
+        subject = str(payload.get("subject") or "").strip() or content.subject
+        prepared = {
+            "job_id": job_id,
+            "provider": "gmail",
+            "recipient": recipient,
+            "subject": subject,
+            "body": content.body,
+            "attachment_path": str(resume_path),
+            "status": "prepared",
+        }
+        store.save_email_application_draft(job_id, prepared)
+        provider = _gmail_provider(config)
+        if not provider.connected():
+            raise HTTPException(
+                status_code=409,
+                detail="The email is prepared locally. Connect Gmail to save it in Drafts.",
+            )
+        try:
+            result = await asyncio.to_thread(
+                provider.create_draft,
+                recipient=recipient,
+                subject=subject,
+                body=content.body,
+                attachment_path=resume_path,
+            )
+        except GmailDraftError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        saved = {
+            **prepared,
+            "provider_draft_id": result.get("id"),
+            "status": "saved",
+            "gmail_url": "https://mail.google.com/mail/u/0/#drafts",
+        }
+        store.save_email_application_draft(job_id, saved)
+        store.audit(
+            "gmail_application_draft_saved",
+            {
+                "provider_draft_id": saved.get("provider_draft_id"),
+                "status": "saved",
+                "attachment_name": resume_path.name,
+            },
+            job_id=job_id,
+        )
+        return saved
 
     @app.get("/api/activity")
     def activity(limit: int = 100):

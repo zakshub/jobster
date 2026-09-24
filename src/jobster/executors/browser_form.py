@@ -256,6 +256,8 @@ class BrowserFormExecutor(ApplicationExecutor):
         page,
         questions: list[ApplicationQuestion],
         plan: ApplicationPlan,
+        *,
+        preserve_existing: bool = False,
     ) -> tuple[list[str], list[str]]:
         filled: list[str] = []
         missing_required: list[str] = []
@@ -270,6 +272,19 @@ class BrowserFormExecutor(ApplicationExecutor):
                 if question.required:
                     missing_required.append(question.label)
                 continue
+
+            if preserve_existing and question.selector:
+                locator = page.locator(question.selector).first
+                try:
+                    if question.input_type.lower() in {"checkbox", "radio"}:
+                        if locator.is_checked():
+                            filled.append(key)
+                            continue
+                    elif question.input_type.lower() != "file" and locator.input_value().strip():
+                        filled.append(key)
+                        continue
+                except Exception:
+                    pass
 
             if self._fill_question(page, question, answer):
                 filled.append(key)
